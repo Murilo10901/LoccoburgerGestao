@@ -45,6 +45,109 @@ import {
 } from './lib/technicalSheetRepository.js'
 import { applyModifierStockConsumption } from './lib/orderModifiers.js'
 
+
+function normalizeRouteValue(value) {
+  const cleanedValue = String(value || '').replace(/^#/, '').replace(/\/+$/, '')
+  return cleanedValue || '/'
+}
+
+function isManagementAreaRoute() {
+  if (typeof window === 'undefined') return false
+
+  const allowedRoutes = new Set(['/gestao', '/admin', '/login', '/app'])
+  const currentPath = normalizeRouteValue(window.location.pathname)
+  const currentHash = normalizeRouteValue(window.location.hash)
+
+  return allowedRoutes.has(currentPath) || allowedRoutes.has(currentHash)
+}
+
+function LandingMaintenancePage() {
+  const currentYear = new Date().getFullYear()
+
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '32px 18px',
+        background:
+          'radial-gradient(circle at top left, rgba(245, 158, 11, 0.2), transparent 34%), linear-gradient(135deg, #0b1410 0%, #111827 52%, #050505 100%)',
+        color: '#fff7ed',
+        fontFamily:
+          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}
+    >
+      <section
+        style={{
+          width: 'min(720px, 100%)',
+          padding: 'clamp(28px, 6vw, 56px)',
+          borderRadius: '32px',
+          border: '1px solid rgba(251, 191, 36, 0.22)',
+          background: 'rgba(15, 23, 42, 0.72)',
+          boxShadow: '0 28px 90px rgba(0, 0, 0, 0.38)',
+          textAlign: 'center',
+          backdropFilter: 'blur(18px)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+          <BrandLogo />
+        </div>
+
+        <p
+          style={{
+            margin: '0 0 14px',
+            color: '#fbbf24',
+            fontSize: 13,
+            fontWeight: 800,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+          }}
+        >
+          LoccoBurger.com
+        </p>
+
+        <h1
+          style={{
+            margin: 0,
+            fontSize: 'clamp(34px, 8vw, 66px)',
+            lineHeight: 0.95,
+            letterSpacing: '-0.06em',
+          }}
+        >
+          Pagina em manutencao
+        </h1>
+
+        <p
+          style={{
+            maxWidth: 520,
+            margin: '22px auto 0',
+            color: '#fed7aa',
+            fontSize: 'clamp(16px, 3vw, 20px)',
+            lineHeight: 1.7,
+          }}
+        >
+          Breve teremos mais informacoes sobre o LoccoBurger.com.
+        </p>
+
+        <div
+          style={{
+            width: 84,
+            height: 4,
+            margin: '34px auto 0',
+            borderRadius: 999,
+            background: 'linear-gradient(90deg, #f97316, #facc15)',
+          }}
+        />
+
+        <p style={{ margin: '34px 0 0', color: 'rgba(255, 247, 237, 0.48)', fontSize: 13 }}>
+          © {currentYear} LoccoBurger
+        </p>
+      </section>
+    </main>
+  )
+}
+
 const initialExpenses = [
   { id: 1, description: 'Compra hortifruti', category: 'Insumos', amount: 186.4, status: 'pago', time: '10:40' },
   { id: 2, description: 'Motoboy extra', category: 'Operacional', amount: 90, status: 'pendente', time: '18:30' },
@@ -305,6 +408,10 @@ function createStateSignature(value) {
 }
 
 export default function App({ icons, hooks }) {
+  if (!isManagementAreaRoute()) {
+    return <LandingMaintenancePage />
+  }
+
   const defaultAppState = hooks.useMemo(() => normalizeAppState(createDefaultAppState()), [])
   const [currentUser, setCurrentUser] = hooks.useState(null)
   const [authMode, setAuthMode] = hooks.useState('signin')
