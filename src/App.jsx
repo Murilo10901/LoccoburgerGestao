@@ -1306,14 +1306,54 @@ export default function App({ icons, hooks }) {
     return newTab
   }
 
-  function handleRequestTableClose(tableId) {
+  function resetTableForNewService(table) {
+    return {
+      ...table,
+      status: 'livre',
+      guests: 0,
+      attendant: '-',
+      total: 0,
+      orderItems: [],
+      customerName: '',
+      tableNumber: '',
+      tableLabel: '',
+      dynamic: false,
+      tabs: [{ id: `${table.id}-mesa`, name: 'Mesa', orderItems: [] }],
+    }
+  }
+
+  function handleRequestTableClose(tableId, options = {}) {
+    const table = tablesState.find((currentTable) => currentTable.id === tableId)
+    if (!table) return { ok: false, message: 'Mesa nao encontrada.' }
+
+    if (options.reset) {
+      setTablesState((currentTables) =>
+        currentTables.flatMap((currentTable) => {
+          if (currentTable.id !== tableId) return [currentTable]
+          return currentTable.dynamic ? [] : [resetTableForNewService(currentTable)]
+        }),
+      )
+      return { ok: true, message: `${getTableSessionLabel(table)} fechada e resetada.` }
+    }
+
     setTablesState((currentTables) =>
-      currentTables.map((table) =>
-        table.id === tableId && table.status !== 'livre'
-          ? { ...table, status: 'fechamento' }
-          : table,
+      currentTables.map((currentTable) =>
+        currentTable.id === tableId && currentTable.status !== 'livre'
+          ? { ...currentTable, status: 'fechamento' }
+          : currentTable,
       ),
     )
+
+    return { ok: true, message: `${getTableSessionLabel(table)} enviada para fechamento.` }
+  }
+
+  function handleDeleteTable(tableId) {
+    const table = tablesState.find((currentTable) => currentTable.id === tableId)
+    if (!table) return { ok: false, message: 'Mesa nao encontrada.' }
+    if (tablesState.length <= 1) return { ok: false, message: 'Mantenha ao menos uma mesa cadastrada.' }
+
+    setTablesState((currentTables) => currentTables.filter((currentTable) => currentTable.id !== tableId))
+    return { ok: true, message: `${getTableSessionLabel(table)} excluida.` }
   }
 
   function consumeProductStock(productId, quantity, modifiers = null) {
@@ -2056,6 +2096,7 @@ export default function App({ icons, hooks }) {
         onAddTableItem={handleAddTableItem}
         onAddTableGuest={handleAddTableGuest}
         onCreateTableSession={handleCreateTableSession}
+        onDeleteTable={handleDeleteTable}
         onOpenTable={handleOpenTable}
         onRemoveTableItem={handleRemoveTableItem}
         onRequestTableClose={handleRequestTableClose}
