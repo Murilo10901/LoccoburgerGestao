@@ -1,0 +1,21 @@
+{
+  "name": "loccoburger-gestao",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:local": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "preview:local": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest"
+  }
+}

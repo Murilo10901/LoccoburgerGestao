@@ -1,0 +1,26 @@
+LIMPEZA DOS DADOS DE TESTE DO LOCCOBURGER
+
+Arquivo para executar:
+
+LIMPAR_TESTES_LOCCOBURGER.bat
+
+O que a rotina faz:
+
+- Apaga pedidos de delivery e itens.
+- Apaga cozinha/fila de preparo.
+- Zera mesas e comandas.
+- Apaga pagamentos, contas a receber, despesas e fechamentos de caixa.
+- Apaga campanhas e mensagens de WhatsApp recebidas em teste.
+- Apaga compras e ajustes/perdas que estavam no estado geral do app.
+- Zera o saldo atual de estoque dos insumos.
+- Mantem produtos cadastrados.
+- Mantem fichas tecnicas cadastradas.
+- Mantem somente os clientes com nome Rogerio, Leila, Murilo ou Flavia.
+
+Antes de rodar:
+
+- Feche o LoccoBurger em outros celulares/computadores.
+- Rode a rotina uma unica vez.
+- Depois atualize a pagina ou saia e entre novamente no sistema.
+
+A rotina pede seu e-mail e senha do sistema, mas nao salva a senha.

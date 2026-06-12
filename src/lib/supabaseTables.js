@@ -1,0 +1,31 @@
+export const supabaseTables = {
+  products: 'products',
+  inventoryItems: 'inventory_items',
+  technicalSheets: 'technical_sheets',
+  technicalSheetItems: 'technical_sheet_items',
+  customers: 'customers',
+  orders: 'orders',
+  orderItems: 'order_items',
+  kitchenTickets: 'kitchen_tickets',
+  stockMovements: 'stock_movements',
+  purchaseOrders: 'purchase_orders',
+  purchaseOrderItems: 'purchase_order_items',
+  payments: 'payments',
+  accountsReceivable: 'accounts_receivable',
+  expenses: 'expenses',
+  customerCampaigns: 'customer_campaigns',
+}
+
+export const localStateToSupabaseMap = {
+  inventory: [supabaseTables.inventoryItems, supabaseTables.stockMovements],
+  technicalSheets: [supabaseTables.technicalSheets, supabaseTables.technicalSheetItems],
+  tables: [supabaseTables.orders, supabaseTables.orderItems],
+  kitchen: [supabaseTables.kitchenTickets],
+  payments: [supabaseTables.payments],
+  accountsReceivable: [supabaseTables.accountsReceivable],
+  expenses: [supabaseTables.expenses],
+  customers: [supabaseTables.customers],
+  customerCampaigns: [supabaseTables.customerCampaigns],
+  deliveries: [supabaseTables.orders, supabaseTables.orderItems],
+  purchaseOrders: [supabaseTables.purchaseOrders, supabaseTables.purchaseOrderItems],
+}

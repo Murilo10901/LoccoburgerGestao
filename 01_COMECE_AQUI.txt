@@ -1,0 +1,36 @@
+LOCCOBURGER GESTAO - COMECE AQUI
+
+Esta pasta contem o sistema LoccoBurger Gestao.
+
+Arquivos mais importantes para voce:
+
+1. README.md
+   Visao geral do projeto.
+
+2. docs/ESTRUTURA_DO_PROJETO.md
+   Mapa das pastas e onde mexer.
+
+3. docs/GUIA_DE_ALTERACOES_MANUAIS.md
+   Como alterar telas, produtos, textos, cores, logo e integracoes.
+
+4. ABRIR_APP_LOCAL.bat
+   Abre o sistema localmente para testar mudancas.
+
+5. GERAR_PACOTE_PRODUCAO.bat
+   Gera a versao final em dist e atualiza o ZIP de producao.
+
+6. PUBLICAR_LOCCOBURGER.bat
+   Publica o sistema na Hostinger.
+
+7. LIMPAR_TESTES_LOCCOBURGER.bat
+   Limpa dados de teste quando necessario.
+
+Fluxo recomendado para alterar manualmente:
+
+1. Abra o arquivo que deseja alterar.
+2. Rode ABRIR_APP_LOCAL.bat.
+3. Teste em http://127.0.0.1:5173.
+4. Rode GERAR_PACOTE_PRODUCAO.bat.
+5. Rode PUBLICAR_LOCCOBURGER.bat.
+
+Evite editar diretamente a pasta dist, pois ela e gerada automaticamente.

@@ -1,0 +1,5 @@
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.fiscal-coupon-import]
+verify_jwt = true

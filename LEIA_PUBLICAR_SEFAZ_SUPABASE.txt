@@ -1,0 +1,33 @@
+PUBLICAR INTEGRACAO SEFAZ NO SUPABASE
+
+Arquivo para executar:
+
+PUBLICAR_FUNCAO_SEFAZ_SUPABASE.bat
+
+O que ele faz:
+
+- Publica a Edge Function fiscal-coupon-import no Supabase.
+- Usa o projeto vqentphbsvnyvambtzlx.
+- Nao precisa instalar nada como administrador.
+- Pede um Supabase Access Token na tela do Windows.
+- Nao salva o token no projeto.
+
+Como conseguir o token:
+
+1. Acesse https://supabase.com/dashboard/account/tokens
+2. Clique para gerar um novo token.
+3. Nome sugerido: LoccoBurger SEFAZ Deploy.
+4. Copie o token gerado.
+5. Rode PUBLICAR_FUNCAO_SEFAZ_SUPABASE.bat e cole o token quando pedir.
+
+Depois do sucesso:
+
+- Acesse o LoccoBurger.
+- Va em Compras.
+- Cole a URL lida no QR Code da NFC-e.
+- Clique em Consultar SEFAZ.
+
+Observacao:
+
+Algumas SEFAZ podem bloquear consulta automatizada, exigir captcha ou mudar o layout.
+Nesses casos o sistema mostra aviso e mantem a conferencia manual.

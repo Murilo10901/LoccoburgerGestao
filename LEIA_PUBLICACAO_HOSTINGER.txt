@@ -1,0 +1,22 @@
+PUBLICACAO DO LOCCOBURGER NA HOSTINGER
+
+Arquivos prontos:
+
+1. PUBLICAR_LOCCOBURGER.bat
+   Tenta enviar o sistema automaticamente para a Hostinger.
+   Ele pede a senha FTP na hora e nao salva a senha.
+
+2. ABRIR_FTP_LOCCOBURGER.bat
+   Abre o WinSCP portatil ja apontando para a Hostinger.
+   Use se preferir enviar os arquivos manualmente.
+
+Dados usados:
+Host FTP: 77.37.127.179
+Usuario FTP: u535762948
+Porta: 21
+Pasta destino: public_html
+
+Arquivos que devem ir para public_html:
+index.html
+.htaccess
+assets
