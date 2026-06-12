@@ -14,7 +14,7 @@ export function AuthPage({
   password,
   storeCode,
 }) {
-  const isSignUp = authMode === 'signup'
+  const isSignUp = false
   const isBusy = authStatus === 'loading'
 
   return (
@@ -87,14 +87,6 @@ export function AuthPage({
           </button>
         )}
 
-        <button
-          className="ghost-button auth-mode-button"
-          disabled={isBusy}
-          onClick={() => onModeChange(isSignUp ? 'signin' : 'signup')}
-          type="button"
-        >
-          {isSignUp ? 'Ja tenho cadastro' : 'Criar novo cadastro'}
-        </button>
       </section>
     </main>
   )

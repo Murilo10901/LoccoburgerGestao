@@ -73,17 +73,64 @@ export async function signIn(email, password) {
 }
 
 export async function resetPassword(email) {
-  if (!email?.trim()) return { ok: false, message: 'Informe o e-mail para recuperar a senha.' }
+  const normalizedEmail = email?.trim().toLowerCase()
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: window.location.origin,
+  if (!normalizedEmail) {
+    return { ok: false, message: 'Informe o e-mail para recuperar a senha.' }
+  }
+
+  const { data: existsData, error: existsError } = await supabase.functions.invoke('auth-user-exists', {
+    body: {
+      email: normalizedEmail,
+    },
   })
 
+  if (existsError) {
+    console.error('Erro ao verificar e-mail:', existsError)
+    return {
+      ok: false,
+      message: 'Nao foi possivel verificar se esse e-mail esta cadastrado.',
+    }
+  }
+
+  if (existsData?.exists !== true) {
+    return {
+      ok: false,
+      message: 'Este e-mail nao existe no sistema. Verifique o e-mail informado ou fale com o administrador.',
+    }
+  }
+
+  const resetUrl = `${window.location.origin}/gestao?reset=senha`
+
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: resetUrl,
+  })
+
+  if (error) {
+    console.error('Erro ao enviar recuperacao de senha:', error)
+    return {
+      ok: false,
+      message: mapAuthError(error),
+    }
+  }
+
+  return {
+    ok: true,
+    message: 'Enviamos um link de recuperacao para o e-mail informado.',
+  }
+}
+
+export async function updatePassword(password) {
+  if (!password || password.length < 6) {
+    return { ok: false, message: 'A nova senha precisa ter no minimo 6 caracteres.' }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password })
   if (error) {
     return { ok: false, message: mapAuthError(error) }
   }
 
-  return { ok: true, message: 'Enviamos um link de recuperacao para o e-mail informado.' }
+  return { ok: true, message: 'Senha alterada com sucesso.' }
 }
 
 export async function signOut() {

@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.fiscal-coupon-import]
 verify_jwt = true
+
+[functions.auth-user-exists]
+verify_jwt = false
