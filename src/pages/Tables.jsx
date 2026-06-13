@@ -83,22 +83,12 @@ function createEmptySelectedModifiers() {
   return { meatPoint: '', removals: [], additions: [] }
 }
 
-function getTableCloseWarning(table) {
-  const label = getTableDisplayLabel(table)
-  const total = currency.format(Number(table?.total || 0))
-  const itemCount = table?.orderItems?.length ?? 0
-
-  return `${label} sera fechada, os dados da comanda serao limpos e essa acao nao podera ser desfeita. Total atual: ${total}. Itens lancados: ${itemCount}.`
-}
-
-
 export function Tables({
   inventoryItems,
   kitchenOrders = [],
   onAddTableItem,
   onAddTableGuest,
   onCreateTableSession,
-  onDeleteTable,
   onOpenTable,
   onRemoveTableItem,
   onRequestTableClose,
@@ -127,9 +117,6 @@ export function Tables({
   const [pendingSentOverride, setPendingSentOverride] = useState(null)
   const [draftItemsByTable, setDraftItemsByTable] = useState({})
   const [quickSelections, setQuickSelections] = useState({})
-  const [isSendingToKitchen, setIsSendingToKitchen] = useState(false)
-  const [toastMessage, setToastMessage] = useState(null)
-  const [confirmAction, setConfirmAction] = useState(null)
   const [expandedSections, setExpandedSections] = useState({
     open: true,
     tables: true,
@@ -205,17 +192,6 @@ export function Tables({
     if (productCategories.includes(selectedCategory)) return
     setSelectedCategory(allCategoriesLabel)
   }, [productCategories, selectedCategory])
-
-  useEffect(() => {
-    if (!toastMessage) return undefined
-
-    const timeoutId = window.setTimeout(() => setToastMessage(null), 4200)
-    return () => window.clearTimeout(timeoutId)
-  }, [toastMessage])
-
-  function showToast(message, type = 'success') {
-    setToastMessage({ message, type })
-  }
 
   function toggleSection(sectionId) {
     setExpandedSections((currentSections) => ({
@@ -394,18 +370,11 @@ export function Tables({
     }))
   }
 
-  async function sendDraftItems(forceStock = false, itemsToSend = selectedDraftItems) {
+  function sendDraftItems(forceStock = false, itemsToSend = selectedDraftItems) {
     if (itemsToSend.length === 0) {
       setOrderMessage({ ok: false, message: 'Nao ha itens em conferencia para enviar.' })
       return
     }
-
-    if (isSendingToKitchen) return
-
-    setIsSendingToKitchen(true)
-    setOrderMessage({ ok: true, message: 'Enviando pedido para a cozinha...' })
-
-    await new Promise((resolve) => window.setTimeout(resolve, 350))
 
     const sentItemIds = []
 
@@ -423,34 +392,23 @@ export function Tables({
         const remainingItems = itemsToSend.filter((draftItem) => !sentItemIds.includes(draftItem.id))
         setPendingOverride(result?.needsOverride ? { items: remainingItems } : null)
         setOrderMessage(result)
-        setIsSendingToKitchen(false)
         return
       }
 
       sentItemIds.push(item.id)
     }
 
-    const tableName = getTableDisplayLabel(selectedTable)
-    const successMessage = `Pedido ${tableName} enviado para a cozinha.`
-
     clearSentDraftItems(selectedTable.id, sentItemIds)
     setPendingOverride(null)
-    setExpandedSections((currentSections) => ({
-      ...currentSections,
-      draft: false,
-      sent: true,
-    }))
     setOrderMessage({
       ok: true,
-      message: successMessage,
+      message: `${sentItemIds.length} item(ns) enviados para a cozinha e lancados na mesa.`,
     })
-    showToast(successMessage, 'success')
-    setIsSendingToKitchen(false)
   }
 
-  async function handleForceAddItem() {
+  function handleForceAddItem() {
     if (!pendingOverride?.items?.length) return
-    await sendDraftItems(true, pendingOverride.items)
+    sendDraftItems(true, pendingOverride.items)
   }
 
   function handleAddGuest(event) {
@@ -524,99 +482,12 @@ export function Tables({
     handleUpdateSentItemQuantity(item, pendingSentOverride.nextQuantity, true)
   }
 
-  function requestCloseSelectedTable() {
-    if (!selectedTable || selectedTable.status === 'livre') {
-      setOrderMessage({ ok: false, message: 'Esta mesa ja esta livre.' })
-      return
-    }
-
-    setConfirmAction({
-      type: 'close',
-      title: 'Fechar e resetar mesa?',
-      message: getTableCloseWarning(selectedTable),
-      confirmLabel: 'Sim, fechar mesa',
-      danger: true,
-    })
-  }
-
-  function requestDeleteSelectedTable() {
-    if (!selectedTable) return
-
-    setConfirmAction({
-      type: 'delete',
-      title: 'Excluir mesa/comanda?',
-      message: `${getTableDisplayLabel(selectedTable)} sera removida da lista. Use isso para limpar comandas criadas por engano. Essa acao nao pode ser desfeita.`,
-      confirmLabel: 'Excluir mesa',
-      danger: true,
-    })
-  }
-
-  function handleConfirmAction() {
-    if (!confirmAction || !selectedTable) return
-
-    if (confirmAction.type === 'close') {
-      const result = onRequestTableClose?.(selectedTable.id, { reset: true })
-      setDraftItemsByTable((currentDrafts) => {
-        const nextDrafts = { ...currentDrafts }
-        delete nextDrafts[selectedTable.id]
-        return nextDrafts
-      })
-      setQuickSelections({})
-      setPendingOverride(null)
-      setPendingSentOverride(null)
-      setOrderMessage(result ?? { ok: true, message: `${getTableDisplayLabel(selectedTable)} fechada e resetada.` })
-      showToast(`${getTableDisplayLabel(selectedTable)} fechada e resetada.`, 'success')
-    }
-
-    if (confirmAction.type === 'delete') {
-      const result = onDeleteTable?.(selectedTable.id)
-      setDraftItemsByTable((currentDrafts) => {
-        const nextDrafts = { ...currentDrafts }
-        delete nextDrafts[selectedTable.id]
-        return nextDrafts
-      })
-      setQuickSelections({})
-      setOrderMessage(result ?? { ok: true, message: `${getTableDisplayLabel(selectedTable)} excluida.` })
-      showToast(`${getTableDisplayLabel(selectedTable)} excluida.`, 'success')
-    }
-
-    setConfirmAction(null)
-  }
-
   if (!selectedTable) {
     return <p className="empty-state">Nenhuma mesa cadastrada.</p>
   }
 
   return (
     <div className="tables-workspace waiter-workspace">
-      {toastMessage && (
-        <div className={`app-toast toast-${toastMessage.type}`} role="status">
-          <span aria-hidden="true">✓</span>
-          <div>
-            <strong>Pedido confirmado</strong>
-            <p>{toastMessage.message}</p>
-          </div>
-        </div>
-      )}
-
-      {confirmAction && (
-        <div className="confirm-overlay" role="presentation">
-          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-            <span className={confirmAction.danger ? 'confirm-icon danger' : 'confirm-icon'} aria-hidden="true">!</span>
-            <h3 id="confirm-title">{confirmAction.title}</h3>
-            <p>{confirmAction.message}</p>
-            <div className="confirm-actions">
-              <button className="ghost-button" type="button" onClick={() => setConfirmAction(null)}>
-                Cancelar
-              </button>
-              <button className={confirmAction.danger ? 'primary-button danger-confirm-button' : 'primary-button'} type="button" onClick={handleConfirmAction}>
-                {confirmAction.confirmLabel}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
       <section className="table-board-panel">
         <CollapsibleSection
           badge="Nome ou mesa"
@@ -698,15 +569,12 @@ export function Tables({
           <div className={orderMessage.ok ? 'form-hint' : 'form-alert'}>{orderMessage.message}</div>
         )}
 
-        <div className="order-actions waiter-actions table-control-actions">
+        <div className="order-actions waiter-actions">
           <button className="secondary-button" type="button" onClick={handleOpenSelectedTable}>
             Abrir selecionada
           </button>
-          <button className="ghost-button" type="button" onClick={requestCloseSelectedTable}>
-            Fechar/resetar mesa
-          </button>
-          <button className="ghost-button danger-button" type="button" onClick={requestDeleteSelectedTable}>
-            Excluir mesa
+          <button className="ghost-button" type="button" onClick={() => onRequestTableClose(selectedTable.id)}>
+            Solicitar fechamento
           </button>
         </div>
 
@@ -972,8 +840,8 @@ export function Tables({
                   Continuar mesmo assim
                 </button>
               )}
-              <button className={`primary-button loading-button ${isSendingToKitchen ? 'is-loading' : ''}`} disabled={isSendingToKitchen} type="button" onClick={() => sendDraftItems()}>
-                {isSendingToKitchen ? 'Enviando para cozinha...' : 'Enviar para cozinha'}
+              <button className="primary-button" type="button" onClick={() => sendDraftItems()}>
+                Enviar para cozinha
               </button>
             </>
           )}

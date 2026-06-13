@@ -3666,165 +3666,183 @@ td small {
 }
 
 
-
-/* Ajustes LoccoBurger - notificacoes, loading e controle de mesas */
-.app-toast {
-  position: fixed;
-  right: 22px;
-  top: 22px;
-  z-index: 70;
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  width: min(380px, calc(100vw - 32px));
-  padding: 14px;
-  border: 1px solid rgba(23, 100, 59, 0.22);
-  border-radius: 18px;
-  color: #16452d;
-  background: #effaf0;
-  box-shadow: 0 20px 50px rgba(31, 56, 39, 0.18);
-  animation: toast-slide-in 180ms ease-out;
-}
-
-.app-toast > span {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: 50%;
-  color: #fffaf5;
-  background: #17643b;
-  font-size: 1.35rem;
-  font-weight: 950;
-}
-
-.app-toast strong,
-.app-toast p {
-  margin: 0;
-}
-
-.app-toast p {
-  margin-top: 3px;
-  color: #2f6547;
-  font-weight: 850;
-  line-height: 1.35;
-}
-
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  padding: 18px;
-  background: rgba(42, 20, 12, 0.52);
-  backdrop-filter: blur(6px);
-}
-
-.confirm-dialog {
-  display: grid;
-  gap: 12px;
-  width: min(430px, 100%);
-  padding: 22px;
-  border: 1px solid rgba(240, 90, 40, 0.22);
-  border-radius: 22px;
-  background: #fffaf5;
-  box-shadow: 0 28px 80px rgba(42, 20, 12, 0.28);
-  text-align: center;
-}
-
-.confirm-icon {
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  justify-self: center;
-  border-radius: 50%;
-  color: #fffaf5;
-  background: #c93a18;
-  font-size: 1.45rem;
-  font-weight: 950;
-}
-
-.confirm-dialog h3,
-.confirm-dialog p {
-  margin: 0;
-}
-
-.confirm-dialog h3 {
-  color: #2d160f;
-  font-size: 1.35rem;
-}
-
-.confirm-dialog p {
-  color: #7a6254;
-  font-weight: 800;
-  line-height: 1.5;
-}
-
-.confirm-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.danger-confirm-button {
-  background: #a72811;
-}
-
-.table-control-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.loading-button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-}
-
-.loading-button.is-loading::before {
-  width: 18px;
-  height: 18px;
-  border: 3px solid rgba(255, 250, 245, 0.45);
-  border-top-color: #fffaf5;
-  border-radius: 50%;
-  content: "";
-  animation: button-spin 700ms linear infinite;
-}
-
-@keyframes button-spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes toast-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+/* Ajustes LoccoBurger - Mesas desktop sem alterar mobile nem logica */
+@media (min-width: 1181px) {
+  .tables-workspace.waiter-workspace {
+    grid-template-columns: minmax(430px, 0.92fr) minmax(560px, 1.08fr);
+    gap: 22px;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+
+  .waiter-workspace .table-board-panel {
+    align-self: start;
+  }
+
+  .waiter-workspace .order-panel {
+    top: 18px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #ffc14f #fff0d3;
+  }
+
+  .waiter-workspace .compact-table-board {
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)) !important;
+  }
+
+  .waiter-workspace .table-pill {
+    min-height: 126px;
+    padding: 16px;
+  }
+
+  .waiter-workspace .table-pill > span {
+    font-size: 1.05rem;
+  }
+
+  .waiter-workspace .open-table-form {
+    grid-template-columns: repeat(3, minmax(160px, 1fr)) minmax(160px, auto);
+  }
+
+  .waiter-workspace .menu-product-grid.quick-menu-grid {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    max-height: 500px;
+    gap: 14px;
+  }
+
+  .waiter-workspace .quick-product-card {
+    min-height: 166px;
+  }
+
+  .waiter-workspace .quick-product-main {
+    min-height: 112px;
+    align-content: start;
+  }
+
+  .waiter-workspace .quick-product-main strong {
+    font-size: 1.03rem;
+    line-height: 1.28;
+  }
+
+  .waiter-workspace .quick-product-actions {
+    grid-template-columns: minmax(130px, 1fr) auto;
+  }
+
+  .waiter-workspace .quick-order-footer {
+    position: sticky;
+    bottom: 0;
+  }
+
+  .waiter-workspace .draft-order-row,
+  .waiter-workspace .sent-order-row {
+    grid-template-columns: minmax(220px, 1fr) auto auto;
   }
 }
 
-@media (max-width: 680px) {
-  .app-toast {
-    top: 12px;
-    right: 12px;
-    left: 12px;
-    width: auto;
+@media (min-width: 1181px) and (max-width: 1420px) {
+  .tables-workspace.waiter-workspace {
+    grid-template-columns: minmax(390px, 0.85fr) minmax(520px, 1.15fr);
   }
 
-  .confirm-dialog {
-    padding: 18px;
+  .waiter-workspace .compact-table-board {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)) !important;
   }
 
-  .confirm-actions,
-  .table-control-actions {
+  .waiter-workspace .menu-product-grid.quick-menu-grid {
+    grid-template-columns: repeat(2, minmax(190px, 1fr));
+  }
+}
+
+/* Correção LoccoBurger - botão Abrir comanda cortado no desktop */
+@media (min-width: 681px) {
+  .waiter-workspace .open-table-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .waiter-workspace .open-table-form .primary-button {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+/* Correção LoccoBurger - produto desktop sem cortar quantidade */
+@media (min-width: 681px) {
+  .waiter-workspace .quick-product-card {
+    min-height: 184px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .waiter-workspace .quick-product-main {
+    flex: 1;
+    min-height: 112px;
+  }
+
+  .waiter-workspace .quick-product-actions {
+    display: grid;
     grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+
+  .waiter-workspace .quick-product-actions .quick-select-button {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .waiter-workspace .quick-product-actions .quantity-stepper,
+  .waiter-workspace .quick-product-actions .compact-stepper {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
+  }
+
+  .waiter-workspace .quick-product-actions .quantity-stepper button,
+  .waiter-workspace .quick-product-actions .quantity-stepper strong {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+  }
+}
+
+/* Correção LoccoBurger - cards do cardapio rapido no desktop sem corte */
+@media (min-width: 681px) {
+  .waiter-workspace .menu-product-grid.quick-menu-grid {
+    max-height: none;
+    overflow-y: visible;
+    padding-bottom: 14px;
+  }
+
+  .waiter-workspace .quick-product-card {
+    min-height: 170px;
+    overflow: visible;
+  }
+
+  .waiter-workspace .quick-product-main {
+    min-height: 92px;
+    padding: 14px 14px 8px;
+  }
+
+  .waiter-workspace .quick-product-actions {
+    padding: 0 14px 14px;
+  }
+
+  .waiter-workspace .quick-product-actions .quick-select-button {
+    min-height: 40px;
+  }
+
+  .waiter-workspace .quick-product-actions .quantity-stepper,
+  .waiter-workspace .quick-product-actions .compact-stepper {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .waiter-workspace .quick-product-actions .quantity-stepper button,
+  .waiter-workspace .quick-product-actions .quantity-stepper strong {
+    width: 100%;
+    min-width: 0;
+    height: 36px;
   }
 }
