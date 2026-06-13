@@ -117,6 +117,8 @@ export function Tables({
   const [pendingSentOverride, setPendingSentOverride] = useState(null)
   const [draftItemsByTable, setDraftItemsByTable] = useState({})
   const [quickSelections, setQuickSelections] = useState({})
+  const [isSendingToKitchen, setIsSendingToKitchen] = useState(false)
+  const [kitchenFeedback, setKitchenFeedback] = useState(null)
   const [expandedSections, setExpandedSections] = useState({
     open: true,
     tables: true,
@@ -192,6 +194,25 @@ export function Tables({
     if (productCategories.includes(selectedCategory)) return
     setSelectedCategory(allCategoriesLabel)
   }, [productCategories, selectedCategory])
+
+  useEffect(() => {
+    if (!kitchenFeedback || kitchenFeedback.type === 'loading') return undefined
+
+    const timer = window.setTimeout(() => {
+      setKitchenFeedback(null)
+    }, 4200)
+
+    return () => window.clearTimeout(timer)
+  }, [kitchenFeedback])
+
+  function getKitchenCustomerLabel() {
+    const tabName = String(selectedTab?.name ?? '').trim()
+    const supportName = getTableSupportLabel(selectedTable)
+
+    if (tabName && tabName.toLowerCase() !== 'mesa') return tabName
+    if (supportName && !['livre', 'mesa aberta', 'sem atendimento'].includes(supportName.toLowerCase())) return supportName
+    return getTableDisplayLabel(selectedTable)
+  }
 
   function toggleSection(sectionId) {
     setExpandedSections((currentSections) => ({
@@ -370,11 +391,23 @@ export function Tables({
     }))
   }
 
-  function sendDraftItems(forceStock = false, itemsToSend = selectedDraftItems) {
+  async function sendDraftItems(forceStock = false, itemsToSend = selectedDraftItems) {
     if (itemsToSend.length === 0) {
       setOrderMessage({ ok: false, message: 'Nao ha itens em conferencia para enviar.' })
       return
     }
+
+    if (isSendingToKitchen) return
+
+    const customerLabel = getKitchenCustomerLabel()
+    setIsSendingToKitchen(true)
+    setKitchenFeedback({
+      type: 'loading',
+      title: 'Enviando para a cozinha...',
+      message: `Preparando pedido de ${customerLabel}. Aguarde um instante.`,
+    })
+
+    await new Promise((resolve) => window.setTimeout(resolve, 450))
 
     const sentItemIds = []
 
@@ -392,6 +425,12 @@ export function Tables({
         const remainingItems = itemsToSend.filter((draftItem) => !sentItemIds.includes(draftItem.id))
         setPendingOverride(result?.needsOverride ? { items: remainingItems } : null)
         setOrderMessage(result)
+        setIsSendingToKitchen(false)
+        setKitchenFeedback({
+          type: 'error',
+          title: 'Pedido nao enviado',
+          message: result?.message ?? 'Nao foi possivel enviar o pedido para a cozinha.',
+        })
         return
       }
 
@@ -400,9 +439,17 @@ export function Tables({
 
     clearSentDraftItems(selectedTable.id, sentItemIds)
     setPendingOverride(null)
+
+    const successMessage = `Pedido de ${customerLabel} enviado para a cozinha.`
     setOrderMessage({
       ok: true,
       message: `${sentItemIds.length} item(ns) enviados para a cozinha e lancados na mesa.`,
+    })
+    setIsSendingToKitchen(false)
+    setKitchenFeedback({
+      type: 'success',
+      title: 'Pedido enviado!',
+      message: successMessage,
     })
   }
 
@@ -488,6 +535,27 @@ export function Tables({
 
   return (
     <div className="tables-workspace waiter-workspace">
+      {kitchenFeedback?.type === 'loading' && (
+        <div className="kitchen-feedback-overlay" role="status" aria-live="polite">
+          <div className="kitchen-feedback-modal">
+            <span className="kitchen-feedback-spinner" aria-hidden="true" />
+            <p className="eyebrow">Cozinha</p>
+            <h3>{kitchenFeedback.title}</h3>
+            <p>{kitchenFeedback.message}</p>
+          </div>
+        </div>
+      )}
+
+      {kitchenFeedback && kitchenFeedback.type !== 'loading' && (
+        <div className={`kitchen-feedback-toast ${kitchenFeedback.type}`} role="status" aria-live="polite">
+          <span aria-hidden="true">{kitchenFeedback.type === 'success' ? '✓' : '!'}</span>
+          <div>
+            <strong>{kitchenFeedback.title}</strong>
+            <small>{kitchenFeedback.message}</small>
+          </div>
+          <button type="button" onClick={() => setKitchenFeedback(null)}>×</button>
+        </div>
+      )}
       <section className="table-board-panel">
         <CollapsibleSection
           badge="Nome ou mesa"
@@ -840,8 +908,8 @@ export function Tables({
                   Continuar mesmo assim
                 </button>
               )}
-              <button className="primary-button" type="button" onClick={() => sendDraftItems()}>
-                Enviar para cozinha
+              <button className="primary-button kitchen-send-button" disabled={isSendingToKitchen} type="button" onClick={() => sendDraftItems()}>
+                {isSendingToKitchen ? 'Enviando...' : 'Enviar para cozinha'}
               </button>
             </>
           )}
