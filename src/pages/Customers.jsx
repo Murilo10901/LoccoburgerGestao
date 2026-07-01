@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
 import {
@@ -41,6 +41,7 @@ export function Customers({
   })
   const [customerMessage, setCustomerMessage] = useState(null)
   const [campaignMessage, setCampaignMessage] = useState(null)
+  const profileRef = useRef(null)
 
   const selectedCustomer =
     rankedCustomers.find((customer) => customer.id === Number(selectedCustomerId)) ?? rankedCustomers[0]
@@ -62,6 +63,15 @@ export function Customers({
       notes: customer.notes,
       tags: (customer.tags ?? []).join(', '),
     })
+  }
+
+  function viewCustomer(customer) {
+    setSelectedCustomerId(customer.id)
+    setCustomerMessage({ ok: true, text: `Mostrando perfil de ${customer.name}.` })
+
+    window.setTimeout(() => {
+      profileRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
   }
 
   function handleSaveCustomer(event) {
@@ -148,7 +158,7 @@ export function Customers({
                   <td>{currency.format(customer.relationship.cashbackBalance)}</td>
                   <td>
                     <div className="row-actions">
-                      <button className="ghost-button" type="button" onClick={() => setSelectedCustomerId(customer.id)}>
+                      <button className="ghost-button" type="button" onClick={() => viewCustomer(customer)}>
                         Ver
                       </button>
                       <button className="ghost-button" type="button" onClick={() => editCustomer(customer)}>
@@ -275,7 +285,7 @@ export function Customers({
         </form>
       </Card>
 
-      <Card>
+      <Card className="customer-profile-card" ref={profileRef}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">Perfil</p>

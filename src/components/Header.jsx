@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrandLogo } from './BrandLogo.jsx'
 
 export function Header({
@@ -10,6 +11,9 @@ export function Header({
   onMenuClick,
   onProfileChange,
   onResetData,
+  onResetFinancialData,
+  onResetInventoryStock,
+  onResetOperationData,
   icons,
   onLogout,
   repositoryStatus,
@@ -19,7 +23,34 @@ export function Header({
 }) {
   const MenuIcon = icons.Menu
   const canPreviewProfiles = userProfile?.role === 'admin'
+  const canRunMaintenance = userProfile?.role === 'admin'
   const profileLabel = accessProfiles[activeProfile]?.label ?? 'Perfil'
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false)
+  const [maintenanceLoading, setMaintenanceLoading] = useState(null)
+  const [maintenanceMessage, setMaintenanceMessage] = useState(null)
+
+  async function runMaintenance(actionId, handler, confirmText) {
+    if (!handler) return
+    if (!window.confirm(confirmText)) return
+
+    setMaintenanceLoading(actionId)
+    setMaintenanceMessage(null)
+
+    try {
+      const result = await handler()
+      setMaintenanceMessage({
+        ok: result?.ok !== false,
+        text: result?.message ?? 'Manutencao concluida.',
+      })
+    } catch (error) {
+      setMaintenanceMessage({
+        ok: false,
+        text: error?.message ?? 'Nao foi possivel concluir a manutencao.',
+      })
+    } finally {
+      setMaintenanceLoading(null)
+    }
+  }
 
   return (
     <header className="header">
@@ -55,9 +86,84 @@ export function Header({
         <span className={`storage-pill storage-${repositoryStatus.mode}`}>{repositoryStatus.label}</span>
         {syncStatus && <span className={`sync-pill sync-${syncStatus.mode}`}>{syncStatus.label}</span>}
         {userEmail && <span className="user-email-pill">{userEmail}</span>}
-        <button className="ghost-button reset-button" type="button" onClick={onResetData}>
-          Limpar testes
-        </button>
+        {canRunMaintenance && (
+          <div className="maintenance-actions">
+            <button
+              className="ghost-button reset-button"
+              type="button"
+              onClick={() => setMaintenanceOpen((isOpen) => !isOpen)}
+            >
+              Manutencao
+            </button>
+            {maintenanceOpen && (
+              <div className="maintenance-menu">
+                <div>
+                  <strong>Limpeza segura</strong>
+                  <span>Salva a limpeza tambem no Supabase. Produtos e cardapio nao sao apagados.</span>
+                </div>
+                <button
+                  className="ghost-button"
+                  disabled={Boolean(maintenanceLoading)}
+                  type="button"
+                  onClick={() =>
+                    runMaintenance(
+                      'operation',
+                      onResetOperationData,
+                      'Limpar mesas, comandas, delivery e fila da cozinha? Esta acao zera a operacao atual.',
+                    )
+                  }
+                >
+                  {maintenanceLoading === 'operation' ? 'Limpando...' : 'Limpar operacao'}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={Boolean(maintenanceLoading)}
+                  type="button"
+                  onClick={() =>
+                    runMaintenance(
+                      'financial',
+                      onResetFinancialData,
+                      'Limpar faturamento, pagamentos, lucro, DRE e fechamentos? Use quando quiser zerar testes financeiros.',
+                    )
+                  }
+                >
+                  {maintenanceLoading === 'financial' ? 'Limpando...' : 'Limpar financeiro/DRE'}
+                </button>
+                <button
+                  className="ghost-button danger-button"
+                  disabled={Boolean(maintenanceLoading)}
+                  type="button"
+                  onClick={() =>
+                    runMaintenance(
+                      'stock',
+                      onResetInventoryStock,
+                      'Zerar todas as quantidades do estoque? Os insumos continuam cadastrados.',
+                    )
+                  }
+                >
+                  {maintenanceLoading === 'stock' ? 'Zerando...' : 'Zerar estoque'}
+                </button>
+                <button
+                  className="ghost-button danger-button"
+                  disabled={Boolean(maintenanceLoading)}
+                  type="button"
+                  onClick={() =>
+                    runMaintenance(
+                      'all',
+                      onResetData,
+                      'Limpar todos os dados de teste da operacao, clientes, delivery e financeiro? Produtos e cardapio serao mantidos.',
+                    )
+                  }
+                >
+                  {maintenanceLoading === 'all' ? 'Limpando...' : 'Limpar tudo de teste'}
+                </button>
+                {maintenanceMessage && (
+                  <p className={maintenanceMessage.ok ? 'form-hint' : 'form-alert'}>{maintenanceMessage.text}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <button className="ghost-button logout-button" type="button" onClick={onLogout}>
           Sair
         </button>

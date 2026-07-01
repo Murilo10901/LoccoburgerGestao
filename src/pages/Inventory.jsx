@@ -23,7 +23,7 @@ const emptyItemForm = {
   supplier: '',
 }
 
-export function Inventory({ inventoryItems, onSaveInventoryItem, onStockAdjustment, onStockEntry, stockAdjustments = [] }) {
+export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryItem, onStockAdjustment, onStockEntry, stockAdjustments = [] }) {
   const [entryForm, setEntryForm] = useState({
     inventoryItemId: inventoryItems[0]?.id ?? '',
     quantity: '',
@@ -39,6 +39,8 @@ export function Inventory({ inventoryItems, onSaveInventoryItem, onStockAdjustme
   const [entryMessage, setEntryMessage] = useState(null)
   const [adjustmentMessage, setAdjustmentMessage] = useState(null)
   const [itemMessage, setItemMessage] = useState(null)
+  const [maintenanceMessage, setMaintenanceMessage] = useState(null)
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false)
 
   const stockValue = inventoryItems.reduce((total, item) => total + item.currentStock * item.averageCost, 0)
   const lowItems = inventoryItems.filter((item) => getStockStatus(item) !== 'saudavel')
@@ -149,6 +151,29 @@ export function Inventory({ inventoryItems, onSaveInventoryItem, onStockAdjustme
     }))
   }
 
+  async function handleResetInventory() {
+    if (!onResetInventory) return
+    if (!window.confirm('Zerar todas as quantidades do estoque? Os insumos continuam cadastrados.')) return
+
+    setMaintenanceLoading(true)
+    setMaintenanceMessage(null)
+
+    try {
+      const result = await onResetInventory()
+      setMaintenanceMessage({
+        ok: result?.ok !== false,
+        text: result?.message ?? 'Estoque zerado.',
+      })
+    } catch (error) {
+      setMaintenanceMessage({
+        ok: false,
+        text: error?.message ?? 'Nao foi possivel zerar o estoque.',
+      })
+    } finally {
+      setMaintenanceLoading(false)
+    }
+  }
+
   return (
     <div className="module-grid">
       <section className="stats-grid compact-stats">
@@ -176,8 +201,23 @@ export function Inventory({ inventoryItems, onSaveInventoryItem, onStockAdjustme
             <p className="eyebrow">Insumos</p>
             <h2>Controle de estoque</h2>
           </div>
-          <span className="soft-label">Atualiza custo medio</span>
+          <div className="row-actions">
+            <span className="soft-label">Atualiza custo medio</span>
+            {onResetInventory && (
+              <button
+                className="ghost-button danger-button"
+                disabled={maintenanceLoading}
+                type="button"
+                onClick={handleResetInventory}
+              >
+                {maintenanceLoading ? 'Zerando...' : 'Limpar estoque'}
+              </button>
+            )}
+          </div>
         </div>
+        {maintenanceMessage && (
+          <div className={maintenanceMessage.ok ? 'form-hint' : 'form-alert'}>{maintenanceMessage.text}</div>
+        )}
 
         <div className="responsive-table">
           <table>

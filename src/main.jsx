@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import App from './App.jsx'
 import './styles.css'
+import './admin-improvements.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

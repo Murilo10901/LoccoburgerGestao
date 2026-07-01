@@ -195,6 +195,20 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
 
   return (
     <div className="kitchen-workspace">
+      <Card className="kitchen-command-card full-span">
+        <div>
+          <p className="eyebrow">Tela de producao</p>
+          <h2>{activeOrders.length === 0 ? 'Cozinha livre no momento' : `${activeOrders.length} pedidos na fila`}</h2>
+          <span>
+            Para usar no iPad da cozinha, escolha Visual &gt; Tablet no topo: a lateral some e os tickets ganham mais area.
+          </span>
+        </div>
+        <div className="kitchen-command-metrics">
+          <strong>{delayedOrders.length}</strong>
+          <span>atrasados</span>
+        </div>
+      </Card>
+
       <section className="stats-grid compact-stats">
         <Card className="stat-card">
           <span>Pedidos ativos</span>
@@ -290,14 +304,14 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
                 <div className="ticket-source">{order.source}</div>
                 <div className={`ticket-timer ${timing.delayed ? 'delayed' : ''}`}>
                   <div>
-                    <span>Cronometro</span>
+                    <span>Tempo de preparo</span>
                     <strong>{formatTimerMinutes(timing.elapsedMinutes)}</strong>
                   </div>
                   <i><b style={{ width: `${timing.progress}%` }} /></i>
                   <small>
                     {timing.delayed
                       ? `${timing.delayMinutes} min atrasado`
-                      : `${timing.remainingMinutes} min restantes`}
+                      : `${timing.remainingMinutes} min restantes no alvo`}
                   </small>
                 </div>
                 <div className="ticket-meta">
@@ -349,7 +363,7 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
                       <div>
                         <strong>{order.item}</strong>
                         <span>{order.id} - aberto {new Date(order.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                        <span>Cronometro {formatTimerMinutes(getKitchenTiming(order, now).elapsedMinutes)} de {order.targetMinutes} min</span>
+                        <span>Tempo {formatTimerMinutes(getKitchenTiming(order, now).elapsedMinutes)} de {order.targetMinutes} min</span>
                         <KitchenInstructions compact order={order} />
                       </div>
                       <div className="kitchen-group-status">

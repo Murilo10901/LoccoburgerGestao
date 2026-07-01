@@ -14,7 +14,7 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
-export function UserPermissions({ currentUser }) {
+export function UserPermissions({ canManageUsers = false, currentUser }) {
   const [profiles, setProfiles] = useState([])
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('Carregando usuarios...')
@@ -47,6 +47,18 @@ export function UserPermissions({ currentUser }) {
   }
 
   async function handleRoleChange(userId, role) {
+    if (!canManageUsers) {
+      setStatus('error')
+      setMessage('Somente um administrador pode editar permissoes de usuarios.')
+      return
+    }
+
+    if (userId === currentUser?.id) {
+      setStatus('error')
+      setMessage('Por seguranca, nao altere o perfil do usuario logado por esta tela.')
+      return
+    }
+
     setUpdatingUserId(userId)
     setMessage('Atualizando perfil...')
     const result = await updateUserRole(userId, role)
@@ -70,6 +82,12 @@ export function UserPermissions({ currentUser }) {
 
   async function handleAttachUser(event) {
     event.preventDefault()
+    if (!canManageUsers) {
+      setStatus('error')
+      setMessage('Somente um administrador pode vincular usuarios a loja.')
+      return
+    }
+
     if (!inviteForm.email.trim()) return
 
     setStatus('loading')
@@ -105,6 +123,9 @@ export function UserPermissions({ currentUser }) {
           </button>
         </div>
         <p className={`auth-message ${status === 'error' ? 'error' : 'success'}`}>{message}</p>
+        {!canManageUsers && (
+          <p className="form-alert">Seu perfil pode visualizar, mas nao pode editar usuarios. Entre com uma conta admin para alterar acessos.</p>
+        )}
       </Card>
 
       {totals.map((role) => (
@@ -145,7 +166,7 @@ export function UserPermissions({ currentUser }) {
                     <select
                       className="permission-select"
                       value={profile.role}
-                      disabled={updatingUserId === profile.user_id}
+                      disabled={!canManageUsers || updatingUserId === profile.user_id || profile.user_id === currentUser?.id}
                       onChange={(event) => handleRoleChange(profile.user_id, event.target.value)}
                     >
                       {roles.map((role) => (
@@ -180,6 +201,7 @@ export function UserPermissions({ currentUser }) {
           <label>
             E-mail do usuario ja cadastrado
             <input
+              disabled={!canManageUsers}
               inputMode="email"
               onChange={(event) => setInviteForm((currentForm) => ({ ...currentForm, email: event.target.value }))}
               placeholder="funcionario@exemplo.com"
@@ -190,6 +212,7 @@ export function UserPermissions({ currentUser }) {
           <label>
             Perfil
             <select
+              disabled={!canManageUsers}
               value={inviteForm.role}
               onChange={(event) => setInviteForm((currentForm) => ({ ...currentForm, role: event.target.value }))}
             >
@@ -198,7 +221,7 @@ export function UserPermissions({ currentUser }) {
               ))}
             </select>
           </label>
-          <button className="secondary-button" type="submit">Vincular a loja</button>
+          <button className="secondary-button" disabled={!canManageUsers} type="submit">Vincular a loja</button>
         </form>
         <p className="form-hint">
           Novo funcionario pode criar cadastro usando o codigo da loja, ou criar cadastro antes e ser vinculado aqui pelo e-mail.

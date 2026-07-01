@@ -148,6 +148,11 @@ export function Cashier({
     event.preventDefault()
     if ((!selectedTable && !selectedDelivery) || netAmount <= 0) return
     const hasSplit = splitPayments.length > 0
+    const paidAccountLabel = selectedDelivery
+      ? `delivery ${selectedDelivery.id}`
+      : paymentScope === 'all'
+        ? `mesa ${String(selectedTable.id).padStart(2, '0')}`
+        : `comanda ${selectedTab?.name ?? paymentScope}`
 
     if (hasSplit && Math.abs(splitDifference) > 0.01) {
       setPaymentMessage({ ok: false, text: `A soma dos pagamentos precisa fechar ${currency.format(netAmount)}. Falta ${currency.format(splitDifference)}.` })
@@ -168,13 +173,25 @@ export function Cashier({
       serviceCharge: serviceAmount,
     }
 
+    let closeResult = { ok: true, message: `Pagamento registrado para ${paidAccountLabel}. Caixa, faturamento e DRE foram atualizados.` }
+
     if (selectedDelivery) {
-      onCloseDeliveryPayment(selectedDelivery.id, paymentMethod, paymentOptions)
+      closeResult = onCloseDeliveryPayment(selectedDelivery.id, paymentMethod, paymentOptions) ?? closeResult
+      if (closeResult.ok === false) {
+        setPaymentMessage({ ok: false, text: closeResult.message ?? 'Nao foi possivel registrar o pagamento.' })
+        return
+      }
+
       const nextDelivery = payableDeliveries.find((order) => order.id !== selectedDelivery.id)
       setSelectedDeliveryId(nextDelivery?.id ?? '')
       if (!nextDelivery && payableTables.length > 0) setAccountType('mesa')
     } else {
-      onCloseTablePayment(selectedTable.id, paymentMethod, paymentScope, paymentOptions)
+      closeResult = onCloseTablePayment(selectedTable.id, paymentMethod, paymentScope, paymentOptions) ?? closeResult
+      if (closeResult.ok === false) {
+        setPaymentMessage({ ok: false, text: closeResult.message ?? 'Nao foi possivel registrar o pagamento.' })
+        return
+      }
+
       const nextTable = payableTables.find((table) => table.id !== selectedTable.id)
       const hasRemainingBalance = paymentScope !== 'all' && selectedTable.total - selectedAmount > 0
       setSelectedTableId(hasRemainingBalance ? selectedTable.id : nextTable?.id ?? '')
@@ -185,7 +202,7 @@ export function Cashier({
     setServiceCharge('')
     setReceivedAmount('')
     setSplitPayments([])
-    setPaymentMessage(null)
+    setPaymentMessage({ ok: true, text: closeResult.message ?? `Pagamento registrado para ${paidAccountLabel}. Caixa, faturamento e DRE foram atualizados.` })
   }
 
   function setExactCash() {

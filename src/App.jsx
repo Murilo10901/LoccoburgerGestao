@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from 'react'
+import './loccoburger-public.css'
+import './loccoburger-landing-final.css'
 import { customers, dashboard, deliveries, inventoryItems, kitchenQueue, products, tables, technicalSheets } from './data/mockData.js'
 import { Layout } from './components/Layout.jsx'
 import { BrandLogo } from './components/BrandLogo.jsx'
@@ -61,93 +64,719 @@ function isManagementAreaRoute() {
   return allowedRoutes.has(currentPath) || allowedRoutes.has(currentHash)
 }
 
-function LandingMaintenancePage() {
-  const currentYear = new Date().getFullYear()
+const meatPoints = [
+  {
+    id: 'bem-passado',
+    label: 'Bem passado',
+    temperature: 'Mais firme, tostado e marcante',
+    imagePosition: '32%',
+    description:
+      'Ideal para quem prefere a carne mais cozida, com crosta mais presente e sabor defumado evidente. A brasa ajuda a manter personalidade sem perder o prazer da mordida.',
+  },
+  {
+    id: 'ao-ponto-bem',
+    label: 'Ao ponto para bem',
+    temperature: 'Centro discreto, crosta intensa',
+    imagePosition: '47%',
+    description:
+      'Um ponto mais firme, mas ainda com umidade no centro. Combina com quem quer a segurança do bem passado sem abrir mão de um pouco de suculência.',
+  },
+  {
+    id: 'ao-ponto',
+    label: 'Ao ponto',
+    temperature: 'Equilíbrio entre suculência e crosta',
+    imagePosition: '61%',
+    description:
+      'O clássico da casa: carne com centro rosado, borda tostada e textura macia. Entrega aquele meio-termo que agrada a maioria e deixa o burger bem apetitoso.',
+  },
+  {
+    id: 'mal-passado',
+    label: 'Mal passado',
+    temperature: 'Mais vermelho, macio e suculento',
+    imagePosition: '76%',
+    description:
+      'Para quem gosta de sentir a carne mais macia, úmida e com sabor intenso de brasa. É o ponto mais suculento, preservando bastante o gosto natural do blend.',
+  },
+]
+
+const menuHighlights = [
+  'Burger Queijo Brie',
+  'Cebola Caramelizada',
+  'Duplo Smash',
+  'Porção de Batata',
+]
+
+const orderCategories = ['Todos', 'Especiais', 'Smash', 'Porções']
+
+const orderProducts = [
+  {
+    id: 'cebola-caramelizada',
+    name: 'Cebola Caramelizada',
+    category: 'Especiais',
+    price: 'R$ 41,90',
+    description: 'Burger gourmet 200g, cheddar, bacon, rúcula, tomate cereja e cebola caramelizada.',
+    image: '/locco-site/hero-burger-v2.png',
+  },
+  {
+    id: 'duplo-smash',
+    name: 'Duplo Smash',
+    category: 'Smash',
+    price: 'R$ 32,90',
+    description: 'Pão brioche, queijo cheddar, bacon, ketchup e mostarda.',
+    image: '/locco-site/hero-burger-v2.png',
+  },
+  {
+    id: 'queijo-brie',
+    name: 'Queijo Brie',
+    category: 'Especiais',
+    price: 'R$ 41,90',
+    description: 'Hambúrguer gourmet 200g com queijo brie, cebola caramelizada, bacon e rúcula.',
+    image: '/locco-site/hero-burger-v2.png',
+  },
+  {
+    id: 'batata',
+    name: 'Porção de Batata',
+    category: 'Porções',
+    price: 'R$ 20,00',
+    description: 'Porção de batata 350g para acompanhar com maionese artesanal da casa.',
+    image: '/locco-site/order-burger-drip-v1.png',
+  },
+]
+
+function CursorTrail() {
+  const canvasRef = useRef(null)
+  const dotRef = useRef(null)
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const revealSelectors = [
+      '.locco-premium-header',
+      '.locco-premium-copy > :not(.locco-premium-score-card)',
+      '.locco-premium-food-stage',
+      '.locco-premium-section',
+      '.locco-premium-cards article',
+      '.locco-premium-meat-selector',
+      '.locco-premium-meat-stack',
+      '.locco-premium-meat-copy',
+      '.locco-premium-meat-detail',
+      '.locco-premium-order-copy',
+      '.locco-premium-order-ui',
+      '.locco-premium-phone',
+      '.locco-premium-mayo-copy',
+      '.locco-premium-mayo-art',
+      '.locco-premium-menu-copy',
+      '.locco-premium-menu-card',
+      '.locco-premium-experience > *',
+      '.locco-premium-location > *',
+      '.locco-premium-footer',
+    ]
+    const revealElements = Array.from(
+      new Set(revealSelectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)))),
+    )
+
+    document.documentElement.classList.add('loccoburger-public-page')
+
+    if (revealElements.length === 0) {
+      return () => document.documentElement.classList.remove('loccoburger-public-page')
+    }
+
+    revealElements.forEach((element, index) => {
+      element.setAttribute('data-locco-reveal', '')
+      element.style.setProperty('--locco-reveal-delay', `${Math.min(index * 65, 520)}ms`)
+    })
+    document.documentElement.classList.add('loccoburger-motion-ready')
+
+    if (prefersReducedMotion.matches || !('IntersectionObserver' in window)) {
+      window.requestAnimationFrame(() => {
+        revealElements.forEach((element) => element.classList.add('is-visible'))
+      })
+
+      return () => {
+        document.documentElement.classList.remove('loccoburger-public-page', 'loccoburger-motion-ready')
+        revealElements.forEach((element) => {
+          element.removeAttribute('data-locco-reveal')
+          element.classList.remove('is-visible')
+          element.style.removeProperty('--locco-reveal-delay')
+        })
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0.14 },
+    )
+
+    revealElements.forEach((element) => observer.observe(element))
+
+    return () => {
+      observer.disconnect()
+      document.documentElement.classList.remove('loccoburger-public-page', 'loccoburger-motion-ready')
+      revealElements.forEach((element) => {
+        element.removeAttribute('data-locco-reveal')
+        element.classList.remove('is-visible')
+        element.style.removeProperty('--locco-reveal-delay')
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const cursorDot = dotRef.current
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const usesFinePointer = window.matchMedia('(pointer: fine)')
+
+    if (!canvas || window.innerWidth < 720 || prefersReducedMotion.matches || !usesFinePointer.matches) {
+      return undefined
+    }
+
+    const context = canvas.getContext('2d')
+    let animationFrame = 0
+    let lastPoint = null
+    let currentPoint = null
+    let width = 0
+    let height = 0
+    let pixelRatio = 1
+
+    const resizeCanvas = () => {
+      width = window.innerWidth
+      height = window.innerHeight
+      pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.floor(width * pixelRatio)
+      canvas.height = Math.floor(height * pixelRatio)
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    }
+
+    const clearTrail = () => {
+      lastPoint = null
+      currentPoint = null
+      if (cursorDot) {
+        cursorDot.style.opacity = '0'
+      }
+    }
+
+    const updatePointer = (event) => {
+      currentPoint = { x: event.clientX, y: event.clientY }
+      if (cursorDot) {
+        cursorDot.style.opacity = '1'
+        cursorDot.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0) translate(-50%, -50%)`
+      }
+    }
+
+    const paint = () => {
+      context.globalCompositeOperation = 'destination-out'
+      context.fillStyle = 'rgba(0, 0, 0, 0.09)'
+      context.fillRect(0, 0, width, height)
+
+      if (currentPoint) {
+        const previousPoint = lastPoint ?? currentPoint
+        const gradient = context.createLinearGradient(previousPoint.x, previousPoint.y, currentPoint.x, currentPoint.y)
+        gradient.addColorStop(0, 'rgba(255, 198, 47, 0.04)')
+        gradient.addColorStop(0.72, 'rgba(255, 198, 47, 0.52)')
+        gradient.addColorStop(1, 'rgba(255, 248, 210, 0.92)')
+
+        context.globalCompositeOperation = 'source-over'
+        context.beginPath()
+        context.moveTo(previousPoint.x, previousPoint.y)
+        context.lineTo(currentPoint.x, currentPoint.y)
+        context.lineCap = 'round'
+        context.lineWidth = 2.4
+        context.strokeStyle = gradient
+        context.shadowBlur = 13
+        context.shadowColor = 'rgba(255, 183, 24, 0.55)'
+        context.stroke()
+        context.shadowBlur = 0
+        lastPoint = currentPoint
+      }
+
+      animationFrame = window.requestAnimationFrame(paint)
+    }
+
+    resizeCanvas()
+    paint()
+    window.addEventListener('resize', resizeCanvas)
+    window.addEventListener('pointermove', updatePointer, { passive: true })
+    window.addEventListener('blur', clearTrail)
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      window.removeEventListener('resize', resizeCanvas)
+      window.removeEventListener('pointermove', updatePointer)
+      window.removeEventListener('blur', clearTrail)
+    }
+  }, [])
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: '32px 18px',
-        background:
-          'radial-gradient(circle at top left, rgba(245, 158, 11, 0.2), transparent 34%), linear-gradient(135deg, #0b1410 0%, #111827 52%, #050505 100%)',
-        color: '#fff7ed',
-        fontFamily:
-          'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      }}
-    >
-      <section
-        style={{
-          width: 'min(720px, 100%)',
-          padding: 'clamp(28px, 6vw, 56px)',
-          borderRadius: '32px',
-          border: '1px solid rgba(251, 191, 36, 0.22)',
-          background: 'rgba(15, 23, 42, 0.72)',
-          boxShadow: '0 28px 90px rgba(0, 0, 0, 0.38)',
-          textAlign: 'center',
-          backdropFilter: 'blur(18px)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
-          <BrandLogo />
-        </div>
-
-        <p
-          style={{
-            margin: '0 0 14px',
-            color: '#fbbf24',
-            fontSize: 13,
-            fontWeight: 800,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-          }}
-        >
-          LoccoBurger.com
-        </p>
-
-        <h1
-          style={{
-            margin: 0,
-            fontSize: 'clamp(34px, 8vw, 66px)',
-            lineHeight: 0.95,
-            letterSpacing: '-0.06em',
-          }}
-        >
-          Pagina em manutencao
-        </h1>
-
-        <p
-          style={{
-            maxWidth: 520,
-            margin: '22px auto 0',
-            color: '#fed7aa',
-            fontSize: 'clamp(16px, 3vw, 20px)',
-            lineHeight: 1.7,
-          }}
-        >
-          Breve teremos mais informacoes sobre o LoccoBurger.com.
-        </p>
-
-        <div
-          style={{
-            width: 84,
-            height: 4,
-            margin: '34px auto 0',
-            borderRadius: 999,
-            background: 'linear-gradient(90deg, #f97316, #facc15)',
-          }}
-        />
-
-        <p style={{ margin: '34px 0 0', color: 'rgba(255, 247, 237, 0.48)', fontSize: 13 }}>
-          © {currentYear} LoccoBurger
-        </p>
-      </section>
-    </main>
+    <>
+      <canvas className="locco-premium-cursor-trail" ref={canvasRef} aria-hidden="true" />
+      <span className="locco-premium-cursor-dot" ref={dotRef} aria-hidden="true" />
+    </>
   )
 }
 
+function LandingMaintenancePage() {
+  const currentYear = new Date().getFullYear()
+  const whatsappNumber = '5511993278115'
+  const whatsappMessage = encodeURIComponent('Ola, vim pelo site do LoccoBurger e quero fazer um pedido.')
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
+  const mapsUrl = 'https://maps.app.goo.gl/rCcrYsNCDD6WdvZZA'
+  const [heroPhotoLoaded, setHeroPhotoLoaded] = useState(false)
+  const [placePhotoLoaded, setPlacePhotoLoaded] = useState(false)
+  const [selectedMeatPoint, setSelectedMeatPoint] = useState(meatPoints[2])
+  const [selectedOrderCategory, setSelectedOrderCategory] = useState(orderCategories[0])
+  const [selectedOrderProduct, setSelectedOrderProduct] = useState(orderProducts[0])
+  const [publicScreen, setPublicScreen] = useState(() => (
+    typeof window !== 'undefined' && window.location.hash === '#pedido' ? 'order' : 'home'
+  ))
+  const visibleOrderProducts = selectedOrderCategory === 'Todos'
+    ? orderProducts
+    : orderProducts.filter((product) => product.category === selectedOrderCategory)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const syncPublicScreen = () => {
+      setPublicScreen(window.location.hash === '#pedido' ? 'order' : 'home')
+    }
+
+    window.addEventListener('hashchange', syncPublicScreen)
+    window.addEventListener('popstate', syncPublicScreen)
+
+    return () => {
+      window.removeEventListener('hashchange', syncPublicScreen)
+      window.removeEventListener('popstate', syncPublicScreen)
+    }
+  }, [])
+
+  const openOrderScreen = (event) => {
+    event.preventDefault()
+    setPublicScreen('order')
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', '#pedido')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const closeOrderScreen = () => {
+    setPublicScreen('home')
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `${window.location.pathname}${window.location.search}`)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const orderExperience = (
+    <section className="locco-premium-order-experience locco-premium-order-screen-content" aria-label="Cardápio digital e pedido pelo QR Code">
+      <div className="locco-premium-order-copy">
+        <p className="locco-premium-kicker">Pedido pelo QR Code</p>
+        <h2>Monte seu pedido em uma tela de app premium.</h2>
+        <p>
+          Essa é a tela demonstrativa do autoatendimento: o cliente escolhe o lanche, envia o pedido,
+          o garçom aprova e a cozinha recebe na gestão.
+        </p>
+
+        <div className="locco-premium-order-flow" aria-label="Fluxo do pedido digital">
+          <span>QR Code</span>
+          <span>Cliente escolhe</span>
+          <span>Garçom aprova</span>
+          <span>Cozinha recebe</span>
+        </div>
+
+        <div className="locco-premium-actions">
+          <a className="locco-premium-primary" href={whatsappUrl} target="_blank" rel="noreferrer">
+            Enviar teste pelo WhatsApp
+          </a>
+          <button className="locco-premium-secondary locco-premium-ghost-button" type="button" onClick={closeOrderScreen}>
+            Voltar ao site
+          </button>
+        </div>
+      </div>
+
+      <div className="locco-premium-order-ui">
+        <article className="locco-premium-phone locco-premium-phone-menu" aria-label="Tela de cardápio mobile LoccoBurger">
+          <header>
+            <button type="button" aria-label="Menu">☰</button>
+            <strong>Locco Menu</strong>
+            <button type="button" aria-label="Carrinho">🛒</button>
+          </header>
+
+          <div className="locco-premium-phone-search">
+            <span>Encontre seu burger</span>
+            <small>Mesa 04 • pedido digital</small>
+          </div>
+
+          <div className="locco-premium-order-tabs" role="tablist" aria-label="Categorias do cardápio">
+            {orderCategories.map((category) => (
+              <button
+                className={selectedOrderCategory === category ? 'is-active' : ''}
+                key={category}
+                type="button"
+                role="tab"
+                aria-selected={selectedOrderCategory === category}
+                onClick={() => setSelectedOrderCategory(category)}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
+          <div className="locco-premium-order-products">
+            {visibleOrderProducts.map((product) => (
+              <button
+                className={selectedOrderProduct.id === product.id ? 'is-active' : ''}
+                key={product.id}
+                type="button"
+                onClick={() => setSelectedOrderProduct(product)}
+              >
+                <img src={product.image} alt="" />
+                <span>{product.name}</span>
+                <small>{product.price}</small>
+                <b>+</b>
+              </button>
+            ))}
+          </div>
+
+          <footer>
+            <span>Subtotal visual</span>
+            <strong>{selectedOrderProduct.price}</strong>
+          </footer>
+        </article>
+
+        <article className="locco-premium-phone locco-premium-phone-detail" aria-label="Tela de produto selecionado">
+          <header>
+            <button type="button" aria-label="Voltar" onClick={closeOrderScreen}>‹</button>
+            <strong>Pedido</strong>
+            <button type="button" aria-label="Favorito">♡</button>
+          </header>
+
+          <div className="locco-premium-order-burst">
+            <img src="/locco-site/order-burger-drip-v1.png" alt="Burger com queijo derretido saindo da tela" />
+          </div>
+
+          <div className="locco-premium-order-detail-copy">
+            <span>{selectedOrderProduct.category}</span>
+            <h3>{selectedOrderProduct.name}</h3>
+            <p>{selectedOrderProduct.description}</p>
+          </div>
+
+          <div className="locco-premium-order-summary">
+            <span>Total</span>
+            <strong>{selectedOrderProduct.price}</strong>
+          </div>
+
+          <a className="locco-premium-order-now" href={whatsappUrl} target="_blank" rel="noreferrer">
+            Enviar pedido
+          </a>
+        </article>
+      </div>
+    </section>
+  )
+
+  if (publicScreen === 'order') {
+    return (
+      <main className="locco-premium locco-premium-order-route">
+        <CursorTrail />
+        <button className="locco-premium-order-back" type="button" onClick={closeOrderScreen}>
+          ← Voltar para o site
+        </button>
+        {orderExperience}
+      </main>
+    )
+  }
+
+  return (
+    <main className={`locco-premium ${heroPhotoLoaded ? 'has-real-burger' : ''} ${placePhotoLoaded ? 'has-place-photo' : ''}`}>
+      <CursorTrail />
+      <div className="locco-premium-noise" aria-hidden="true" />
+      <div className="locco-premium-word word-left" aria-hidden="true">LOCCO</div>
+      <div className="locco-premium-word word-right" aria-hidden="true">BRASA</div>
+
+      <section className="locco-premium-hero" id="inicio">
+        <header className="locco-premium-header">
+          <a className="locco-premium-brand" href="/" aria-label="LoccoBurger inicio">
+            <BrandLogo />
+            <span>
+              <strong>LoccoBurger</strong>
+              <small>Hamburgueria na brasa</small>
+            </span>
+          </a>
+
+          <nav aria-label="Navegacao do site LoccoBurger">
+            <a href="#quem-somos">Quem somos</a>
+            <a href="#brasa">Na brasa</a>
+            <a href="#pedido" onClick={openOrderScreen}>Pedido</a>
+            <a href="#ponto-da-carne">Ponto da carne</a>
+            <a href="#cardapio">Cardápio</a>
+            <a href="#localizacao">Localização</a>
+          </nav>
+
+          <a className="locco-premium-order-link" href="#pedido" onClick={openOrderScreen}>
+            Fazer pedido
+          </a>
+        </header>
+
+        <div className="locco-premium-hero-grid">
+          <section className="locco-premium-copy">
+            <p className="locco-premium-kicker">Santo André • artesanal • na brasa</p>
+            <h1>
+              Hamburguer artesanal
+              <span>feito na brasa.</span>
+            </h1>
+            <p className="locco-premium-lead">
+              O LoccoBurger prepara lanches na brasa com ingredientes frescos, carne selecionada e aquele sabor marcante de hamburgueria de verdade.
+            </p>
+
+            <div className="locco-premium-score-card">
+              <span>★ ★ ★ ★ ★</span>
+              <strong>Burger Cebola Caramelizada</strong>
+              <small>Especial da casa com queijo, carne na brasa e cebola caramelizada.</small>
+            </div>
+
+            <div className="locco-premium-actions">
+              <a className="locco-premium-primary" href="#pedido" onClick={openOrderScreen}>Fazer pedido agora</a>
+              <a className="locco-premium-secondary" href={mapsUrl} target="_blank" rel="noreferrer">Ver localização</a>
+            </div>
+
+            <div className="locco-premium-tags" aria-label="Diferenciais LoccoBurger">
+              <span>Carne na brasa</span>
+              <span>Ingredientes frescos</span>
+              <span>Atendimento no local</span>
+            </div>
+          </section>
+
+          <section className="locco-premium-food-stage" aria-label="Burger destaque LoccoBurger">
+            <div className="locco-premium-launch-card">
+              <span>Especial da casa</span>
+              <strong>Burger Cebola Caramelizada</strong>
+              <small>Imagem real do lanche em breve.</small>
+            </div>
+
+            <div className="locco-premium-hero-photo">
+              <img
+                alt="Burger artesanal do LoccoBurger"
+                src="/locco-site/hero-burger-v2.png"
+                onLoad={() => setHeroPhotoLoaded(true)}
+                onError={() => setHeroPhotoLoaded(false)}
+              />
+              <div className="locco-premium-css-burger" aria-hidden="true">
+                <span className="bun top" />
+                <span className="lettuce" />
+                <span className="cheese" />
+                <span className="meat" />
+                <span className="onion" />
+                <span className="bun bottom" />
+                <span className="board" />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <a className="locco-premium-scroll-cue" href="#quem-somos" aria-label="Explorar a página">
+          <span aria-hidden="true" />
+          Explorar
+        </a>
+      </section>
+
+      <section className="locco-premium-section locco-premium-about" id="quem-somos">
+        <div>
+          <p className="locco-premium-kicker">Quem somos</p>
+          <h2>Uma hamburgueria com identidade, cuidado e sabor marcante.</h2>
+        </div>
+        <p>
+          Somos uma hamburgueria de Santo André feita para quem gosta de lanche bem montado,
+          atendimento direto e comida preparada com atenção. Cada detalhe importa: o pão,
+          a carne, o ponto, os acompanhamentos e a experiência de receber você no nosso espaço.
+        </p>
+      </section>
+
+      <section className="locco-premium-cards" id="brasa">
+        <article>
+          <span>01</span>
+          <h3>Feito na brasa</h3>
+          <p>O preparo ganha aroma, intensidade e aquele sabor defumado que marca cada mordida.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Produtos frescos</h3>
+          <p>Ingredientes selecionados para entregar qualidade, textura e equilíbrio em cada lanche.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Variedade Locco</h3>
+          <p>Combinações para diferentes fomes e momentos, sempre com a personalidade da casa.</p>
+        </article>
+      </section>
+
+      <section className="locco-premium-meat-section" id="ponto-da-carne">
+        <div className="locco-premium-meat-copy">
+          <p className="locco-premium-kicker">Ponto da carne</p>
+          <h2>Escolha o ponto e sinta a diferença na mordida.</h2>
+          <p>
+            A carne muda textura, aroma e suculência conforme o ponto. Clique nas camadas para entender
+            qual combina mais com sua fome de hoje.
+          </p>
+
+          <div className="locco-premium-meat-selector" role="tablist" aria-label="Escolha do ponto da carne">
+            {meatPoints.map((point) => (
+              <button
+                className={selectedMeatPoint.id === point.id ? 'is-active' : ''}
+                key={point.id}
+                type="button"
+                role="tab"
+                aria-selected={selectedMeatPoint.id === point.id}
+                onClick={() => setSelectedMeatPoint(point)}
+              >
+                <span>{point.label}</span>
+                <small>{point.temperature}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="locco-premium-meat-stack" aria-label="Pontos da carne LoccoBurger">
+          <img
+            className="locco-premium-meat-image"
+            src="/locco-site/pontos-carne-3d-v1.png"
+            alt="Montagem 3D com hambúrgueres em diferentes pontos da carne"
+          />
+          <div className="locco-premium-meat-hotspots" aria-label="Clique no ponto da carne desejado">
+            {meatPoints.map((point) => (
+              <button
+                className={`locco-premium-meat-hotspot ${selectedMeatPoint.id === point.id ? 'is-active' : ''}`}
+                key={point.id}
+                type="button"
+                style={{ '--point-y': point.imagePosition }}
+                onClick={() => setSelectedMeatPoint(point)}
+                aria-pressed={selectedMeatPoint.id === point.id}
+              >
+                <span>{point.label}</span>
+                <small>{point.temperature}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <aside className="locco-premium-meat-detail" aria-live="polite">
+          <span>Selecionado</span>
+          <h3>{selectedMeatPoint.label}</h3>
+          <strong>{selectedMeatPoint.temperature}</strong>
+          <p>{selectedMeatPoint.description}</p>
+        </aside>
+      </section>
+
+      <section className="locco-premium-mayo-section" id="maionese-da-casa">
+        <div className="locco-premium-mayo-copy">
+          <p className="locco-premium-kicker">Maionese da casa</p>
+          <h2>Artesanal, cremosa e feita para acompanhar batata e burger.</h2>
+          <p>
+            A maionese artesanal da LoccoBurger chega com toque suave, textura cremosa e aquele sabor
+            de acompanhamento que faz a porção de batata sumir da mesa rapidinho.
+          </p>
+          <a className="locco-premium-secondary" href={whatsappUrl} target="_blank" rel="noreferrer">
+            Pedir com maionese da casa
+          </a>
+        </div>
+
+        <div className="locco-premium-mayo-art" aria-label="Arte 3D da maionese artesanal">
+          <div className="mayo-pot">
+            <span className="mayo-lid" />
+            <span className="mayo-label">Locco</span>
+            <span className="mayo-shine" />
+            <span className="mayo-drip drip-one" />
+            <span className="mayo-drip drip-two" />
+            <span className="mayo-drip drip-three" />
+          </div>
+          <div className="mayo-sauce" />
+        </div>
+      </section>
+
+      <section className="locco-premium-menu-section" id="cardapio">
+        <div className="locco-premium-menu-copy">
+          <p className="locco-premium-kicker">Cardápio</p>
+          <h2>Escolha seu Locco favorito e peça pelo WhatsApp.</h2>
+          <p>
+            Tem burger clássico, smash, especiais da casa, porção de batata e bebidas. Dá uma olhada
+            no cardápio e chama a gente para montar seu pedido.
+          </p>
+          <div className="locco-premium-menu-highlights" aria-label="Destaques do cardápio">
+            {menuHighlights.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+          <a className="locco-premium-primary" href={whatsappUrl} target="_blank" rel="noreferrer">
+            Ver cardápio e pedir
+          </a>
+        </div>
+
+        <a className="locco-premium-menu-card" href="/locco-site/cardapio-locco-burger.jpeg" target="_blank" rel="noreferrer">
+          <img src="/locco-site/cardapio-locco-burger.jpeg" alt="Cardápio LoccoBurger" />
+          <span>Abrir cardápio completo</span>
+        </a>
+      </section>
+
+      <section className="locco-premium-experience">
+        <div className="locco-premium-photo-card">
+          <img
+            alt="Espaço LoccoBurger"
+            src="/locco-site/fachada.jpg"
+            onLoad={() => setPlacePhotoLoaded(true)}
+            onError={() => setPlacePhotoLoaded(false)}
+          />
+          <div className="locco-premium-photo-fallback">
+            <strong>Nosso espaço</strong>
+            <span>Adicione aqui foto da fachada ou do salão.</span>
+          </div>
+        </div>
+        <div className="locco-premium-experience-text">
+          <p className="locco-premium-kicker">Atendimento no local</p>
+          <h2>Um lugar para chegar, pedir e curtir um burger de brasa.</h2>
+          <p>
+            Estamos sempre à disposição para receber você, preparar seu pedido com cuidado e entregar uma experiência
+            que combine comida boa, ambiente direto e o estilo LoccoBurger.
+          </p>
+        </div>
+      </section>
+
+      <section className="locco-premium-location" id="localizacao">
+        <div>
+          <p className="locco-premium-kicker">Localização</p>
+          <h2>Estamos em Santo André.</h2>
+          <p>Av. Nova Iorque, 304 - Santo André, Brazil</p>
+          <div className="locco-premium-actions compact">
+            <a className="locco-premium-primary" href={whatsappUrl} target="_blank" rel="noreferrer">Pedir pelo WhatsApp</a>
+            <a className="locco-premium-secondary" href={mapsUrl} target="_blank" rel="noreferrer">Abrir no Maps</a>
+          </div>
+        </div>
+
+        <div className="locco-premium-hours">
+          <h3>Horário de funcionamento</h3>
+          <dl>
+            <div><dt>Terça-feira</dt><dd>17:00–23:00</dd></div>
+            <div><dt>Quarta-feira</dt><dd>17:00–23:00</dd></div>
+            <div><dt>Quinta-feira</dt><dd>17:00–23:00</dd></div>
+            <div><dt>Sexta-feira</dt><dd>17:00–23:00</dd></div>
+            <div><dt>Sábado</dt><dd>17:00–23:00</dd></div>
+            <div><dt>Domingo</dt><dd>Fechado</dd></div>
+            <div><dt>Segunda-feira</dt><dd>Fechado</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      <footer className="locco-premium-footer">
+        <span>© {currentYear} LoccoBurger</span>
+        <strong>Hamburgueria artesanal na brasa.</strong>
+      </footer>
+    </main>
+  )
+}
 const initialExpenses = [
   { id: 1, description: 'Compra hortifruti', category: 'Insumos', amount: 186.4, status: 'pago', time: '10:40' },
   { id: 2, description: 'Motoboy extra', category: 'Operacional', amount: 90, status: 'pendente', time: '18:30' },
@@ -541,6 +1170,91 @@ export default function App({ icons, hooks }) {
     setWhatsAppInboxState(nextState.whatsAppInbox ?? [])
     setProductsState(nextState.products ?? products)
     setPurchaseOrdersState(nextState.purchaseOrders ?? [])
+  }
+
+  async function persistMaintenanceState(nextState, successMessage, options = {}) {
+    const normalizedState = normalizeAppState(nextState)
+    appStateRef.current = normalizedState
+    applyAppState(normalizedState)
+    setSaveStatus('saving')
+
+    const saveJobs = [saveAppState(normalizedState)]
+
+    if (currentUser) {
+      saveJobs.push(
+        saveCatalogTables({
+          inventory: normalizedState.inventory ?? [],
+          products: normalizedState.products ?? [],
+          technicalSheets: normalizedState.technicalSheets ?? [],
+        }),
+        saveCustomerDeliveryTables({
+          customers: normalizedState.customers ?? [],
+          customerCampaigns: normalizedState.customerCampaigns ?? [],
+          deliveries: normalizedState.deliveries ?? [],
+        }),
+        saveFinanceTables({
+          payments: normalizedState.payments ?? [],
+          accountsReceivable: normalizedState.accountsReceivable ?? [],
+          expenses: normalizedState.expenses ?? [],
+          cashClosings: normalizedState.cashClosings ?? [],
+        }),
+        saveOperationTables({
+          tables: normalizedState.tables ?? [],
+          kitchen: normalizedState.kitchen ?? [],
+        }),
+      )
+    }
+
+    const results = await Promise.all(saveJobs)
+    const failedResult = results.find((result) => result && result.ok === false)
+    const message = failedResult?.message ?? successMessage
+
+    setSaveStatus(failedResult ? 'error' : 'saved')
+    setAuthMessage({ type: failedResult ? 'error' : 'success', text: message })
+
+    if (options.activePage) setActivePage(options.activePage)
+
+    return { ok: !failedResult, message }
+  }
+
+  async function persistCheckoutState(nextState, successMessage) {
+    const normalizedState = normalizeAppState(nextState)
+    appStateRef.current = normalizedState
+    applyAppState(normalizedState)
+    setSaveStatus('saving')
+
+    const saveJobs = [saveAppState(normalizedState)]
+
+    if (currentUser) {
+      saveJobs.push(
+        saveCustomerDeliveryTables({
+          customers: normalizedState.customers ?? [],
+          customerCampaigns: normalizedState.customerCampaigns ?? [],
+          deliveries: normalizedState.deliveries ?? [],
+        }),
+        saveFinanceTables({
+          payments: normalizedState.payments ?? [],
+          accountsReceivable: normalizedState.accountsReceivable ?? [],
+          expenses: normalizedState.expenses ?? [],
+          cashClosings: normalizedState.cashClosings ?? [],
+        }),
+        saveOperationTables({
+          tables: normalizedState.tables ?? [],
+          kitchen: normalizedState.kitchen ?? [],
+        }),
+      )
+    }
+
+    const results = await Promise.all(saveJobs)
+    const failedResult = results.find((result) => result && result.ok === false)
+    const message = failedResult?.message ?? successMessage
+
+    setSaveStatus(failedResult ? 'error' : 'saved')
+    if (failedResult) {
+      setAuthMessage({ type: 'error', text: message })
+    }
+
+    return { ok: !failedResult, message }
   }
 
   async function hydrateAppData() {
@@ -1052,25 +1766,83 @@ export default function App({ icons, hooks }) {
     return () => window.clearInterval(intervalId)
   }, [currentUser, dataReady])
 
-  function handleResetData() {
+  async function handleResetData() {
     clearAppState()
-    const defaultState = normalizeAppState(createDefaultAppState())
-    setInventoryState(defaultState.inventory)
-    setTechnicalSheetsState(defaultState.technicalSheets)
-    setTablesState(defaultState.tables)
-    setKitchenState(defaultState.kitchen)
-    setPaymentsState(defaultState.payments)
-    setAccountsReceivableState(defaultState.accountsReceivable)
-    setCashClosingsState(defaultState.cashClosings)
-    setExpensesState(defaultState.expenses)
-    setStockAdjustmentsState(defaultState.stockAdjustments)
-    setCustomersState(defaultState.customers)
-    setCustomerCampaignsState(defaultState.customerCampaigns)
-    setDeliveryState(defaultState.deliveries)
-    setWhatsAppInboxState(defaultState.whatsAppInbox)
-    setProductsState(defaultState.products)
-    setPurchaseOrdersState(defaultState.purchaseOrders)
-    setActivePage('dashboard')
+    const currentState = getCurrentAppState()
+    const cleanState = {
+      ...currentState,
+      tables: createDefaultTablesState(),
+      kitchen: [],
+      payments: [],
+      accountsReceivable: [],
+      cashClosings: [],
+      expenses: [],
+      stockAdjustments: [],
+      customers: [],
+      customerCampaigns: [],
+      deliveries: [],
+      whatsAppInbox: [],
+      purchaseOrders: [],
+    }
+
+    return persistMaintenanceState(
+      cleanState,
+      'Dados de teste limpos. Operacao, clientes de teste, delivery, financeiro e DRE foram zerados no sistema.',
+      { activePage: 'dashboard' },
+    )
+  }
+
+  async function handleResetOperationData() {
+    const currentState = getCurrentAppState()
+    const cleanState = {
+      ...currentState,
+      tables: createDefaultTablesState(),
+      kitchen: [],
+      deliveries: [],
+      whatsAppInbox: [],
+    }
+
+    return persistMaintenanceState(
+      cleanState,
+      'Operacao limpa. Mesas, comandas, delivery e fila da cozinha foram zerados.',
+      { activePage: 'mesas' },
+    )
+  }
+
+  async function handleResetFinancialData() {
+    const currentState = getCurrentAppState()
+    const cleanState = {
+      ...currentState,
+      payments: [],
+      accountsReceivable: [],
+      cashClosings: [],
+      expenses: [],
+      stockAdjustments: [],
+    }
+
+    return persistMaintenanceState(
+      cleanState,
+      'Financeiro limpo. Faturamento, lucro, DRE, recebiveis e fechamentos foram zerados.',
+      { activePage: 'financeiro' },
+    )
+  }
+
+  async function handleResetInventoryStock() {
+    const currentState = getCurrentAppState()
+    const cleanState = {
+      ...currentState,
+      inventory: currentState.inventory.map((item) => ({
+        ...item,
+        currentStock: 0,
+      })),
+      stockAdjustments: [],
+    }
+
+    return persistMaintenanceState(
+      cleanState,
+      'Estoque zerado. Os insumos continuam cadastrados, mas todas as quantidades ficaram em 0.',
+      { activePage: 'estoque' },
+    )
   }
 
   function handleSaveProduct(product) {
@@ -1662,7 +2434,10 @@ export default function App({ icons, hooks }) {
 
   function handleCloseTablePayment(tableId, paymentMethod, tabId = 'all', options = {}) {
     const table = tablesState.find((item) => item.id === tableId)
-    if (!table || table.total <= 0) return
+    if (!table || table.total <= 0) {
+      return { ok: false, message: 'Mesa sem saldo para fechar.' }
+    }
+
     const tableTabs = table.tabs?.length
       ? table.tabs
       : [{ id: `${table.id}-mesa`, name: 'Mesa', orderItems: table.orderItems ?? [] }]
@@ -1675,7 +2450,10 @@ export default function App({ icons, hooks }) {
       ? Number(table.total || paidItems.reduce((total, item) => total + item.total, 0))
       : paidItems.reduce((total, item) => total + item.total, 0)
 
-    if (paidAmount <= 0) return
+    if (paidAmount <= 0) {
+      return { ok: false, message: 'Nao existe valor nesta comanda para registrar pagamento.' }
+    }
+
     const discount = Math.max(0, Number(options.discount || 0))
     const serviceCharge = Math.max(0, Number(options.serviceCharge || 0))
     const netAmount = Math.max(0, paidAmount - discount + serviceCharge)
@@ -1684,56 +2462,56 @@ export default function App({ icons, hooks }) {
       : [{ method: paymentMethod, amount: netAmount, customerId: options.customerId }]
     const partsTotal = paymentParts.reduce((total, payment) => total + Number(payment.amount || 0), 0)
 
-    if (Math.abs(partsTotal - netAmount) > 0.01) return
+    if (Math.abs(partsTotal - netAmount) > 0.01) {
+      return { ok: false, message: 'A soma dos pagamentos nao fecha com o total liquido.' }
+    }
 
     const missingNotebookCustomer = paymentParts.some((payment) =>
       payment.method === 'caderneta' && !customersState.some((customer) => customer.id === Number(payment.customerId)),
     )
 
-    if (missingNotebookCustomer) return
+    if (missingNotebookCustomer) {
+      return { ok: false, message: 'Selecione um cliente cadastrado para lancar na caderneta.' }
+    }
 
     const itemCarrierIndex = paymentParts.findIndex((payment) => payment.method !== 'caderneta')
     const paidItemsIndex = itemCarrierIndex >= 0 ? itemCarrierIndex : 0
+    const now = new Date()
+    const paymentTimestamp = now.getTime()
+    const paidItemIds = new Set(paidItems.map((paidItem) => paidItem.id))
+    const nextPaymentRecords = paymentParts.map((payment, index) => {
+      const isNotebook = payment.method === 'caderneta'
+      const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
 
-    setPaymentsState((currentPayments) => [
-      ...paymentParts.map((payment, index) => {
-        const isNotebook = payment.method === 'caderneta'
-        const notebookCustomer = isNotebook
-          ? customersState.find((customer) => customer.id === Number(payment.customerId))
-          : null
-        const amount = isNotebook ? 0 : Number(payment.amount)
+      return {
+        id: `${paymentTimestamp}-${tableId}-${tabId}-${index}`,
+        tableId,
+        tabId,
+        tabName: tabId === 'all' ? 'Mesa inteira' : selectedTab?.name,
+        method: payment.method,
+        amount: isNotebook ? 0 : Number(payment.amount),
+        grossAmount: index === paidItemsIndex ? paidAmount : 0,
+        netAmount: Number(payment.amount),
+        customerId: notebookCustomer?.id ?? null,
+        customerName: notebookCustomer?.name ?? null,
+        discount: index === paidItemsIndex ? discount : 0,
+        serviceCharge: index === paidItemsIndex ? serviceCharge : 0,
+        receivedAmount: isNotebook ? 0 : Number(payment.amount),
+        change: 0,
+        time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        paidAt: now.toLocaleDateString('pt-BR'),
+        paidAtIso: now.toISOString(),
+        items: index === paidItemsIndex ? paidItems : [],
+      }
+    })
+    const nextReceivableRecords = paymentParts
+      .filter((payment) => payment.method === 'caderneta')
+      .map((payment, index) => {
+        const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
 
         return {
-          id: `${Date.now()}-${tableId}-${tabId}-${index}`,
-          tableId,
-          tabId,
-          tabName: tabId === 'all' ? 'Mesa inteira' : selectedTab?.name,
-          method: payment.method,
-          amount,
-          grossAmount: index === paidItemsIndex ? paidAmount : 0,
-          netAmount: Number(payment.amount),
-          customerId: notebookCustomer?.id ?? null,
-          customerName: notebookCustomer?.name ?? null,
-          discount: index === paidItemsIndex ? discount : 0,
-          serviceCharge: index === paidItemsIndex ? serviceCharge : 0,
-          receivedAmount: isNotebook ? 0 : Number(payment.amount),
-          change: 0,
-          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          items: index === paidItemsIndex ? paidItems : [],
-        }
-      }),
-      ...currentPayments,
-    ])
-
-    paymentParts
-      .filter((payment) => payment.method === 'caderneta')
-      .forEach((payment) => {
-      const now = new Date()
-      const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
-      setAccountsReceivableState((currentReceivables) => [
-        {
-          id: `${Date.now()}-${payment.customerId}`,
-          code: `CR-${String(currentReceivables.length + 1).padStart(4, '0')}`,
+          id: `${paymentTimestamp}-${payment.customerId}-${index}`,
+          code: `CR-${String(accountsReceivableState.length + index + 1).padStart(4, '0')}`,
           customerId: notebookCustomer.id,
           customerName: notebookCustomer.name,
           description: `Caderneta ${getTableSessionLabel(table)}${tabId === 'all' ? '' : ` - ${selectedTab?.name ?? ''}`}`,
@@ -1749,60 +2527,87 @@ export default function App({ icons, hooks }) {
           tableId,
           tabId,
           items: paidItems,
-        },
-        ...currentReceivables,
-      ])
+        }
+      })
+    const nextPayments = [...nextPaymentRecords, ...paymentsState]
+    const nextReceivables = [...nextReceivableRecords, ...accountsReceivableState]
+    const nextTables = tablesState.flatMap((item) => {
+      if (item.id !== tableId) return [item]
+
+      if (tabId === 'all') {
+        if (item.dynamic) return []
+
+        return [{
+          ...item,
+          status: 'livre',
+          guests: 0,
+          attendant: '-',
+          total: 0,
+          orderItems: [],
+          customerName: '',
+          tableNumber: '',
+          tableLabel: '',
+          dynamic: false,
+          tabs: [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: [] }],
+        }]
+      }
+
+      const itemTabs = item.tabs?.length
+        ? item.tabs
+        : [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: item.orderItems ?? [] }]
+      const remainingTabs = itemTabs
+        .map((tab) =>
+          tab.id === tabId
+            ? { ...tab, orderItems: [] }
+            : { ...tab, orderItems: (tab.orderItems ?? []).filter((orderItem) => !paidItemIds.has(orderItem.id)) },
+        )
+        .filter((tab) => tab.name === 'Mesa' || (tab.orderItems ?? []).length > 0)
+      const remainingItems = remainingTabs.flatMap((tab) => tab.orderItems ?? [])
+      const nextTotal = remainingItems.reduce((total, orderItem) => total + Number(orderItem.total || 0), 0)
+
+      if (nextTotal <= 0) {
+        return [{
+          ...item,
+          status: 'livre',
+          guests: 0,
+          attendant: '-',
+          total: 0,
+          orderItems: [],
+          customerName: '',
+          tableNumber: '',
+          tableLabel: '',
+          dynamic: false,
+          tabs: [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: [] }],
+        }]
+      }
+
+      return [{
+        ...item,
+        status: item.status === 'livre' ? 'ocupada' : item.status,
+        guests: Math.max(1, remainingTabs.filter((tab) => tab.name !== 'Mesa').length),
+        total: nextTotal,
+        orderItems: remainingItems,
+        tabs: remainingTabs,
+      }]
     })
+    const nextState = {
+      ...getCurrentAppState(),
+      tables: nextTables,
+      payments: nextPayments,
+      accountsReceivable: nextReceivables,
+    }
+    const successMessage = `${getTableSessionLabel(table)} fechada e zerada no caixa.`
 
-    setTablesState((currentTables) =>
-      currentTables.flatMap((item) =>
-        item.id === tableId && tabId === 'all'
-          ? item.dynamic
-            ? []
-            : [{
-                ...item,
-                status: 'livre',
-                guests: 0,
-                attendant: '-',
-                total: 0,
-                orderItems: [],
-                customerName: '',
-                tableNumber: '',
-                tableLabel: '',
-                dynamic: false,
-                tabs: [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: [] }],
-              }]
-          : item.id === tableId
-            ? (() => {
-                const paidItemIds = new Set(paidItems.map((paidItem) => paidItem.id))
-                const remainingItems = item.orderItems.filter((orderItem) => !paidItemIds.has(orderItem.id))
-                const remainingTabs = tableTabs
-                  .map((tab) =>
-                    tab.id === tabId
-                      ? { ...tab, orderItems: [] }
-                      : { ...tab, orderItems: (tab.orderItems ?? []).filter((orderItem) => !paidItemIds.has(orderItem.id)) },
-                  )
-                  .filter((tab) => tab.name === 'Mesa' || (tab.orderItems ?? []).length > 0)
-                const nextTotal = remainingItems.reduce((total, orderItem) => total + orderItem.total, 0)
+    void persistCheckoutState(nextState, successMessage)
 
-                return {
-                  ...item,
-                  status: nextTotal > 0 ? item.status : 'livre',
-                  guests: nextTotal > 0 ? Math.max(1, remainingTabs.filter((tab) => tab.name !== 'Mesa').length) : 0,
-                  attendant: nextTotal > 0 ? item.attendant : '-',
-                  total: nextTotal,
-                  orderItems: remainingItems,
-                  tabs: nextTotal > 0 ? remainingTabs : [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: [] }],
-                }
-              })()
-          : [item],
-      ),
-    )
+    return { ok: true, message: successMessage }
   }
 
   function handleCloseDeliveryPayment(deliveryId, paymentMethod, options = {}) {
     const deliveryOrder = deliveryState.find((order) => order.id === deliveryId)
-    if (!deliveryOrder || Number(deliveryOrder.total || 0) <= 0) return
+    if (!deliveryOrder || Number(deliveryOrder.total || 0) <= 0) {
+      return { ok: false, message: 'Delivery sem saldo para fechar.' }
+    }
 
     const paidItems = deliveryOrder.items ?? []
     const paidAmount = Number(deliveryOrder.total || 0)
@@ -1814,86 +2619,93 @@ export default function App({ icons, hooks }) {
       : [{ method: paymentMethod, amount: netAmount, customerId: options.customerId }]
     const partsTotal = paymentParts.reduce((total, payment) => total + Number(payment.amount || 0), 0)
 
-    if (Math.abs(partsTotal - netAmount) > 0.01) return
+    if (Math.abs(partsTotal - netAmount) > 0.01) {
+      return { ok: false, message: 'A soma dos pagamentos nao fecha com o total liquido.' }
+    }
 
     const missingNotebookCustomer = paymentParts.some((payment) =>
       payment.method === 'caderneta' && !customersState.some((customer) => customer.id === Number(payment.customerId)),
     )
 
-    if (missingNotebookCustomer) return
+    if (missingNotebookCustomer) {
+      return { ok: false, message: 'Selecione um cliente cadastrado para lancar na caderneta.' }
+    }
 
     const itemCarrierIndex = paymentParts.findIndex((payment) => payment.method !== 'caderneta')
     const paidItemsIndex = itemCarrierIndex >= 0 ? itemCarrierIndex : 0
+    const now = new Date()
+    const paymentTimestamp = now.getTime()
+    const nextPaymentRecords = paymentParts.map((payment, index) => {
+      const isNotebook = payment.method === 'caderneta'
+      const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
 
-    setPaymentsState((currentPayments) => [
-      ...paymentParts.map((payment, index) => {
-        const isNotebook = payment.method === 'caderneta'
-        const notebookCustomer = isNotebook
-          ? customersState.find((customer) => customer.id === Number(payment.customerId))
-          : null
-        const amount = isNotebook ? 0 : Number(payment.amount)
+      return {
+        id: `${paymentTimestamp}-${deliveryId}-${index}`,
+        source: 'delivery',
+        deliveryId,
+        customerId: notebookCustomer?.id ?? deliveryOrder.customerId ?? null,
+        customerName: notebookCustomer?.name ?? deliveryOrder.customer ?? null,
+        method: payment.method,
+        amount: isNotebook ? 0 : Number(payment.amount),
+        grossAmount: index === paidItemsIndex ? paidAmount : 0,
+        netAmount: Number(payment.amount),
+        discount: index === paidItemsIndex ? discount : 0,
+        serviceCharge: index === paidItemsIndex ? serviceCharge : 0,
+        receivedAmount: isNotebook ? 0 : Number(payment.amount),
+        change: 0,
+        time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        paidAt: now.toLocaleDateString('pt-BR'),
+        paidAtIso: now.toISOString(),
+        items: index === paidItemsIndex ? paidItems : [],
+      }
+    })
+    const nextReceivableRecords = paymentParts
+      .filter((payment) => payment.method === 'caderneta')
+      .map((payment, index) => {
+        const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
 
         return {
-          id: `${Date.now()}-${deliveryId}-${index}`,
-          source: 'delivery',
+          id: `${paymentTimestamp}-${payment.customerId}-${index}`,
+          code: `CR-${String(accountsReceivableState.length + index + 1).padStart(4, '0')}`,
+          customerId: notebookCustomer.id,
+          customerName: notebookCustomer.name,
+          description: `Caderneta Delivery ${deliveryId}`,
+          amount: Number(payment.amount),
+          grossAmount: Number(payment.amount),
+          discount: 0,
+          serviceCharge: 0,
+          status: 'aberto',
+          createdAt: now.toLocaleDateString('pt-BR'),
+          createdAtIso: now.toISOString().slice(0, 10),
+          dueDate: now.toLocaleDateString('pt-BR'),
+          time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           deliveryId,
-          customerId: notebookCustomer?.id ?? deliveryOrder.customerId ?? null,
-          customerName: notebookCustomer?.name ?? deliveryOrder.customer ?? null,
-          method: payment.method,
-          amount,
-          grossAmount: index === paidItemsIndex ? paidAmount : 0,
-          netAmount: Number(payment.amount),
-          discount: index === paidItemsIndex ? discount : 0,
-          serviceCharge: index === paidItemsIndex ? serviceCharge : 0,
-          receivedAmount: isNotebook ? 0 : Number(payment.amount),
-          change: 0,
-          time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          items: index === paidItemsIndex ? paidItems : [],
+          items: paidItems,
         }
-      }),
-      ...currentPayments,
-    ])
-
-    paymentParts
-      .filter((payment) => payment.method === 'caderneta')
-      .forEach((payment) => {
-        const now = new Date()
-        const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
-        setAccountsReceivableState((currentReceivables) => [
-          {
-            id: `${Date.now()}-${payment.customerId}`,
-            code: `CR-${String(currentReceivables.length + 1).padStart(4, '0')}`,
-            customerId: notebookCustomer.id,
-            customerName: notebookCustomer.name,
-            description: `Caderneta Delivery ${deliveryId}`,
-            amount: Number(payment.amount),
-            grossAmount: Number(payment.amount),
-            discount: 0,
-            serviceCharge: 0,
-            status: 'aberto',
-            createdAt: now.toLocaleDateString('pt-BR'),
-            createdAtIso: now.toISOString().slice(0, 10),
-            dueDate: now.toLocaleDateString('pt-BR'),
-            time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            deliveryId,
-            items: paidItems,
-          },
-          ...currentReceivables,
-        ])
       })
-
-    setDeliveryState((currentOrders) =>
-      currentOrders.map((order) =>
+    const nextPayments = [...nextPaymentRecords, ...paymentsState]
+    const nextReceivables = [...nextReceivableRecords, ...accountsReceivableState]
+    const nextDeliveries = deliveryState.map((order) =>
         order.id === deliveryId
           ? {
               ...order,
               paymentStatus: 'pago',
               paymentMethod: paymentParts.length > 1 ? 'dividido' : paymentParts[0]?.method ?? paymentMethod,
-              paidAt: new Date().toISOString(),
+              paidAt: now.toISOString(),
             }
           : order,
-      ),
-    )
+      )
+    const nextState = {
+      ...getCurrentAppState(),
+      deliveries: nextDeliveries,
+      payments: nextPayments,
+      accountsReceivable: nextReceivables,
+    }
+    const successMessage = `Delivery ${deliveryId} pago e atualizado no caixa.`
+
+    void persistCheckoutState(nextState, successMessage)
+
+    return { ok: true, message: successMessage }
   }
 
   function handleAddExpense(expense) {
@@ -2158,6 +2970,7 @@ export default function App({ icons, hooks }) {
     estoque: (
       <Inventory
         inventoryItems={inventoryState}
+        onResetInventory={handleResetInventoryStock}
         onSaveInventoryItem={handleSaveInventoryItem}
         onStockAdjustment={handleStockAdjustment}
         onStockEntry={handleStockEntry}
@@ -2205,7 +3018,7 @@ export default function App({ icons, hooks }) {
         technicalSheets={technicalSheetsState}
       />
     ),
-    usuarios: <UserPermissions currentUser={currentUser} />,
+    usuarios: <UserPermissions canManageUsers={userProfile?.role === 'admin'} currentUser={currentUser} />,
   }
 
   if (authLoading) {
@@ -2265,6 +3078,9 @@ export default function App({ icons, hooks }) {
       pageTitle={pageTitle}
       icons={icons}
       onResetData={handleResetData}
+      onResetFinancialData={handleResetFinancialData}
+      onResetInventoryStock={handleResetInventoryStock}
+      onResetOperationData={handleResetOperationData}
       onLogout={handleLogout}
       repositoryStatus={repositoryStatus}
       syncStatus={syncStatus}

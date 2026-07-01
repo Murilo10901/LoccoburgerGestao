@@ -16,6 +16,9 @@ export function Layout({
   onLogout,
   onProfileChange,
   onResetData,
+  onResetFinancialData,
+  onResetInventoryStock,
+  onResetOperationData,
   pageTitle,
   repositoryStatus,
   syncStatus,
@@ -23,16 +26,21 @@ export function Layout({
   userProfile,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const deviceClass = `app-device-${deviceView ?? 'auto'}`
+  const pageClass = activePage ? `app-page-${activePage}` : ''
+  const profileClass = activeProfile ? `app-profile-${activeProfile}` : ''
 
   return (
-    <div className={`app-shell ${deviceClass}`} data-device-view={deviceView ?? 'auto'}>
+    <div className={`app-shell ${deviceClass} ${pageClass} ${profileClass} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`} data-device-view={deviceView ?? 'auto'}>
       <Sidebar
         activePage={activePage}
+        isCollapsed={sidebarCollapsed}
         isOpen={sidebarOpen}
         navigation={navigation}
         onClose={() => setSidebarOpen(false)}
         onNavigate={onNavigate}
+        onToggleCollapse={() => setSidebarCollapsed((isCollapsed) => !isCollapsed)}
       />
       <main className="main-content">
         <Header
@@ -42,10 +50,16 @@ export function Layout({
           deviceViewOptions={deviceViewOptions}
           icons={icons}
           onDeviceViewChange={onDeviceViewChange}
-          onMenuClick={() => setSidebarOpen(true)}
+          onMenuClick={() => {
+            setSidebarCollapsed(false)
+            setSidebarOpen(true)
+          }}
           onLogout={onLogout}
           onProfileChange={onProfileChange}
           onResetData={onResetData}
+          onResetFinancialData={onResetFinancialData}
+          onResetInventoryStock={onResetInventoryStock}
+          onResetOperationData={onResetOperationData}
           pageTitle={pageTitle}
           repositoryStatus={repositoryStatus}
           syncStatus={syncStatus}

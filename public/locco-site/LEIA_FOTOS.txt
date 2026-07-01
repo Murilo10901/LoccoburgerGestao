@@ -1,0 +1,1 @@
+Coloque aqui as fotos reais do LoccoBurger quando estiverem prontas. Sugestao: cebola-caramelizada.png, fachada.jpg, ambiente.jpg. Esta versao usa ilustracao em CSS para nao quebrar sem as fotos.

@@ -4015,3 +4015,1278 @@ td small {
     width: auto;
   }
 }
+
+
+/* LoccoBurger - site publico institucional */
+.locco-public-site {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #fff7d7;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 190, 55, 0.28), transparent 28rem),
+    radial-gradient(circle at 82% 22%, rgba(255, 122, 24, 0.22), transparent 32rem),
+    linear-gradient(135deg, #0a2d1d 0%, #122a1c 48%, #071811 100%);
+}
+
+.locco-public-site a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.locco-public-hero {
+  position: relative;
+  padding: clamp(18px, 4vw, 46px);
+}
+
+.locco-public-hero::before,
+.locco-public-hero::after {
+  position: fixed;
+  z-index: 0;
+  color: rgba(255, 247, 215, 0.045);
+  font-size: clamp(7rem, 15vw, 18rem);
+  font-weight: 950;
+  letter-spacing: -0.08em;
+  pointer-events: none;
+  content: "LOCCO";
+}
+
+.locco-public-hero::before {
+  left: -5vw;
+  bottom: 7vh;
+  transform: rotate(-8deg);
+}
+
+.locco-public-hero::after {
+  content: "BURGER";
+  right: -8vw;
+  top: 12vh;
+  transform: rotate(8deg);
+}
+
+.locco-public-shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 1320px);
+  margin: 0 auto;
+  border: 1px solid rgba(255, 211, 101, 0.18);
+  border-radius: 34px;
+  padding: clamp(22px, 4vw, 42px);
+  background:
+    linear-gradient(120deg, rgba(16, 55, 35, 0.96), rgba(9, 33, 22, 0.93)),
+    #0d2a1c;
+  box-shadow: 0 36px 80px rgba(0, 0, 0, 0.35);
+}
+
+.locco-public-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.locco-public-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.locco-public-brand .brand-logo img {
+  width: 62px;
+  height: 62px;
+  border-color: rgba(255, 211, 101, 0.65);
+}
+
+.locco-public-brand strong,
+.locco-public-brand span {
+  display: block;
+}
+
+.locco-public-brand strong {
+  font-size: 1.12rem;
+  font-weight: 950;
+}
+
+.locco-public-brand span {
+  color: rgba(255, 247, 215, 0.7);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.locco-public-nav nav {
+  display: inline-flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 247, 215, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.locco-public-nav nav a {
+  border-radius: 999px;
+  padding: 10px 16px;
+  color: rgba(255, 247, 215, 0.86);
+  font-weight: 950;
+}
+
+.locco-public-nav nav a:hover {
+  color: #132013;
+  background: #ffc232;
+}
+
+.locco-public-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) minmax(420px, 1.14fr);
+  gap: clamp(22px, 5vw, 68px);
+  align-items: center;
+  min-height: 680px;
+  padding: 64px 0 28px;
+}
+
+.locco-public-copy {
+  display: grid;
+  gap: 22px;
+  align-content: center;
+}
+
+.locco-public-kicker {
+  margin: 0;
+  color: #ffc232;
+  font-size: 0.82rem;
+  font-weight: 950;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.locco-public-copy h1 {
+  max-width: 670px;
+  margin: 0;
+  color: #fff4d4;
+  font-size: clamp(3.3rem, 7.6vw, 7rem);
+  line-height: 0.92;
+  letter-spacing: -0.08em;
+  text-wrap: balance;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.22);
+}
+
+.locco-public-copy p,
+.locco-public-about p,
+.locco-public-location p,
+.locco-public-order p {
+  max-width: 620px;
+  margin: 0;
+  color: rgba(255, 247, 215, 0.72);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.7;
+}
+
+.locco-public-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.locco-public-main-button,
+.locco-public-ghost-button {
+  display: inline-flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 14px 24px;
+  font-weight: 950;
+}
+
+.locco-public-main-button {
+  color: #23140a;
+  background: linear-gradient(135deg, #ffc232, #ff7a18);
+  box-shadow: 0 18px 28px rgba(255, 122, 24, 0.24);
+}
+
+.locco-public-ghost-button {
+  border: 1px solid rgba(255, 247, 215, 0.24);
+  color: #fff7d7;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.locco-public-rating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.locco-public-rating strong,
+.locco-public-rating span {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #12311f;
+  background: #fff7d7;
+  font-size: 0.84rem;
+  font-weight: 950;
+}
+
+.locco-public-rating span {
+  color: #fff7d7;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.locco-public-showcase {
+  position: relative;
+  min-height: 650px;
+}
+
+.locco-public-showcase::before {
+  position: absolute;
+  inset: 6% -4% 16% 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 136, 20, 0.92), rgba(255, 136, 20, 0.28) 58%, transparent 70%);
+  filter: blur(1px);
+  content: "";
+}
+
+.locco-public-badge {
+  position: absolute;
+  left: 6%;
+  top: 8%;
+  z-index: 3;
+  display: grid;
+  gap: 5px;
+  width: 220px;
+  border-radius: 18px;
+  padding: 18px;
+  color: #943113;
+  background: #fff7d7;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.18);
+  transform: rotate(-6deg);
+}
+
+.locco-public-badge strong {
+  font-size: 1rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.locco-public-badge span {
+  color: #1d2b16;
+  font-weight: 950;
+}
+
+.locco-public-photo-stage {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-height: 560px;
+  place-items: center;
+}
+
+.locco-public-photo-frame {
+  position: relative;
+  display: grid;
+  width: min(100%, 680px);
+  min-height: 460px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 38px;
+}
+
+.locco-public-burger-art {
+  position: relative;
+  width: min(92%, 560px);
+  height: 390px;
+  animation: locco-public-float 4.8s ease-in-out infinite;
+}
+
+.locco-public-burger-art span {
+  position: absolute;
+  left: 50%;
+  display: block;
+  transform: translateX(-50%);
+}
+
+.locco-public-burger-art .bun.top {
+  top: 42px;
+  width: 76%;
+  height: 120px;
+  border-radius: 95px 95px 40px 40px;
+  background: linear-gradient(180deg, #ffe097, #d58426);
+  box-shadow: inset 0 -12px 0 rgba(108, 45, 10, 0.15), 0 26px 36px rgba(0, 0, 0, 0.24);
+}
+
+.locco-public-burger-art .leaf {
+  top: 146px;
+  width: 86%;
+  height: 46px;
+  border-radius: 999px;
+  background: #6dad39;
+  box-shadow: -22px 12px 0 #4f8d2d, 28px 10px 0 #5e9c34;
+}
+
+.locco-public-burger-art .cheese {
+  top: 181px;
+  width: 74%;
+  height: 44px;
+  background: linear-gradient(135deg, #ffd246, #f5a715);
+  clip-path: polygon(0 0, 100% 0, 88% 100%, 72% 42%, 50% 100%, 32% 44%, 15% 100%);
+}
+
+.locco-public-burger-art .meat {
+  top: 205px;
+  width: 78%;
+  height: 66px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5a2518, #2c100c);
+  box-shadow: inset 0 10px 0 rgba(255, 255, 255, 0.06);
+}
+
+.locco-public-burger-art .onion {
+  top: 264px;
+  width: 70%;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9b3d18, #f08a26);
+  opacity: 0.9;
+}
+
+.locco-public-burger-art .bun.bottom {
+  top: 292px;
+  width: 72%;
+  height: 80px;
+  border-radius: 34px 34px 76px 76px;
+  background: linear-gradient(180deg, #e99a32, #c66a1f);
+  box-shadow: 0 42px 42px rgba(0, 0, 0, 0.34);
+}
+
+.locco-public-product-card {
+  position: absolute;
+  right: 0;
+  bottom: 32px;
+  z-index: 3;
+  width: min(92%, 520px);
+  border: 1px solid rgba(255, 247, 215, 0.14);
+  border-radius: 24px;
+  padding: 24px;
+  color: #fff7d7;
+  background: rgba(36, 22, 8, 0.72);
+  box-shadow: 0 24px 42px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+}
+
+.locco-public-product-card span {
+  color: #ffc232;
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.locco-public-product-card h2 {
+  margin: 8px 0;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+}
+
+.locco-public-product-card p {
+  margin: 0;
+  color: rgba(255, 247, 215, 0.72);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.locco-public-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.locco-public-tabs button {
+  min-height: 92px;
+  border: 1px solid rgba(255, 247, 215, 0.12);
+  border-radius: 20px;
+  padding: 16px;
+  color: #fff7d7;
+  background: rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.locco-public-tabs button.active {
+  border-color: #ffc232;
+  color: #162817;
+  background: #ffc232;
+}
+
+.locco-public-tabs span,
+.locco-public-tabs strong {
+  display: block;
+}
+
+.locco-public-tabs span {
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.locco-public-tabs strong {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.locco-public-section,
+.locco-public-feature-grid,
+.locco-public-location,
+.locco-public-order,
+.locco-public-footer {
+  position: relative;
+  z-index: 1;
+  width: min(calc(100% - 38px), 1320px);
+  margin: 22px auto;
+}
+
+.locco-public-about,
+.locco-public-location,
+.locco-public-order {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 28px;
+  align-items: center;
+  border: 1px solid rgba(255, 247, 215, 0.12);
+  border-radius: 28px;
+  padding: clamp(24px, 4vw, 42px);
+  background: rgba(255, 247, 215, 0.06);
+}
+
+.locco-public-about h2,
+.locco-public-location h2,
+.locco-public-order h2 {
+  margin: 8px 0 0;
+  color: #fff7d7;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.locco-public-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.locco-public-feature-grid article,
+.locco-public-hours {
+  border: 1px solid rgba(255, 247, 215, 0.12);
+  border-radius: 24px;
+  padding: 24px;
+  background: rgba(255, 247, 215, 0.08);
+}
+
+.locco-public-feature-grid span {
+  color: #ffc232;
+  font-weight: 950;
+}
+
+.locco-public-feature-grid h3,
+.locco-public-hours h3 {
+  margin: 10px 0;
+  font-size: 1.35rem;
+}
+
+.locco-public-feature-grid p {
+  margin: 0;
+  color: rgba(255, 247, 215, 0.72);
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.locco-public-location {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.55fr);
+}
+
+.locco-public-location .locco-public-main-button {
+  width: fit-content;
+  margin-top: 18px;
+}
+
+.locco-public-hours dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.locco-public-hours div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 247, 215, 0.1);
+  padding-bottom: 10px;
+}
+
+.locco-public-hours dt,
+.locco-public-hours dd {
+  margin: 0;
+  font-weight: 900;
+}
+
+.locco-public-hours dt {
+  color: rgba(255, 247, 215, 0.68);
+}
+
+.locco-public-hours dd {
+  color: #fff7d7;
+  text-align: right;
+}
+
+.locco-public-order {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.locco-public-order .brand-logo img {
+  width: 96px;
+  height: 96px;
+}
+
+.locco-public-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 0 44px;
+  color: rgba(255, 247, 215, 0.62);
+  font-weight: 850;
+}
+
+@keyframes locco-public-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-14px) rotate(1deg); }
+}
+
+@media (max-width: 980px) {
+  .locco-public-grid,
+  .locco-public-about,
+  .locco-public-location,
+  .locco-public-order {
+    grid-template-columns: 1fr;
+  }
+
+  .locco-public-grid {
+    min-height: 0;
+    padding-top: 42px;
+  }
+
+  .locco-public-feature-grid,
+  .locco-public-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .locco-public-showcase {
+    min-height: 590px;
+  }
+
+  .locco-public-order {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 680px) {
+  .locco-public-hero {
+    padding: 0;
+  }
+
+  .locco-public-shell {
+    min-height: 100vh;
+    border-radius: 0;
+    padding: 22px;
+  }
+
+  .locco-public-nav {
+    align-items: flex-start;
+  }
+
+  .locco-public-nav nav {
+    display: none;
+  }
+
+  .locco-public-copy h1 {
+    font-size: clamp(3.3rem, 17vw, 4.85rem);
+  }
+
+  .locco-public-copy p,
+  .locco-public-about p,
+  .locco-public-location p,
+  .locco-public-order p {
+    font-size: 0.96rem;
+  }
+
+  .locco-public-actions,
+  .locco-public-main-button,
+  .locco-public-ghost-button {
+    width: 100%;
+  }
+
+  .locco-public-showcase {
+    min-height: 540px;
+  }
+
+  .locco-public-badge {
+    left: 0;
+    top: 0;
+    width: 180px;
+  }
+
+  .locco-public-photo-stage {
+    min-height: 430px;
+  }
+
+  .locco-public-photo-frame {
+    min-height: 360px;
+  }
+
+  .locco-public-burger-art {
+    width: 108%;
+    height: 330px;
+  }
+
+  .locco-public-product-card {
+    right: auto;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+  }
+
+  .locco-public-section,
+  .locco-public-feature-grid,
+  .locco-public-location,
+  .locco-public-order,
+  .locco-public-footer {
+    width: calc(100% - 24px);
+  }
+
+  .locco-public-about,
+  .locco-public-location,
+  .locco-public-order,
+  .locco-public-feature-grid article,
+  .locco-public-hours {
+    border-radius: 22px;
+    padding: 20px;
+  }
+
+  .locco-public-order .brand-logo img {
+    width: 74px;
+    height: 74px;
+  }
+
+  .locco-public-footer {
+    display: grid;
+  }
+}
+
+/* =========================================================
+   LOCCOBURGER SITE PUBLICO V2 - FULL SCREEN HERO
+   Remove o visual de card pequeno e transforma a home em tela cheia.
+   ========================================================= */
+.locco-home-v2,
+.locco-home-v2 * {
+  box-sizing: border-box;
+}
+
+.locco-home-v2 {
+  --locco-green: #0b3b26;
+  --locco-green-dark: #071b12;
+  --locco-green-soft: #1d4d31;
+  --locco-cream: #fff5cf;
+  --locco-gold: #ffc429;
+  --locco-orange: #ff7a16;
+  --locco-brown: #4b2414;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: var(--locco-cream);
+  background:
+    radial-gradient(circle at 70% 28%, rgba(255, 196, 41, 0.24), transparent 23rem),
+    radial-gradient(circle at 16% 42%, rgba(255, 122, 22, 0.13), transparent 28rem),
+    linear-gradient(115deg, #071b12 0%, #0b3b26 42%, #071b12 100%);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.locco-home-v2::before {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at center, black, transparent 78%);
+  content: "";
+}
+
+.locco-v2-bg-word {
+  position: fixed;
+  z-index: 0;
+  color: rgba(255, 245, 207, 0.045);
+  font-size: clamp(7rem, 17vw, 20rem);
+  font-weight: 1000;
+  letter-spacing: -0.08em;
+  line-height: 0.8;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.locco-v2-bg-word-left {
+  left: -4vw;
+  bottom: 4vh;
+  transform: rotate(-8deg);
+}
+
+.locco-v2-bg-word-right {
+  right: -9vw;
+  top: 13vh;
+  transform: rotate(8deg);
+}
+
+.locco-v2-glow {
+  position: fixed;
+  z-index: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(10px);
+}
+
+.locco-v2-glow-one {
+  right: 7vw;
+  top: 10vh;
+  width: 28vw;
+  height: 28vw;
+  background: radial-gradient(circle, rgba(255, 196, 41, 0.22), transparent 62%);
+}
+
+.locco-v2-glow-two {
+  left: -8vw;
+  bottom: -12vw;
+  width: 34vw;
+  height: 34vw;
+  background: radial-gradient(circle, rgba(255, 122, 22, 0.15), transparent 65%);
+}
+
+.locco-v2-hero,
+.locco-v2-info-strip,
+.locco-v2-story,
+.locco-v2-location {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 72px, 1440px);
+  margin-inline: auto;
+}
+
+.locco-v2-hero {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 34px 0 28px;
+}
+
+.locco-v2-nav {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 0;
+}
+
+.locco-v2-brand {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 14px;
+  color: var(--locco-cream);
+  text-decoration: none;
+}
+
+.locco-v2-brand .brand-logo,
+.locco-v2-brand .brand-logo img {
+  width: 72px;
+  height: 72px;
+}
+
+.locco-v2-brand .brand-logo img {
+  border: 2px solid rgba(255, 196, 41, 0.72);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+}
+
+.locco-v2-brand strong,
+.locco-v2-brand span {
+  display: block;
+}
+
+.locco-v2-brand strong {
+  font-size: 1.22rem;
+  font-weight: 1000;
+}
+
+.locco-v2-brand span {
+  color: rgba(255, 245, 207, 0.72);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.locco-v2-nav nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 245, 207, 0.18);
+  border-radius: 999px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px);
+}
+
+.locco-v2-nav nav a,
+.locco-v2-nav-order {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 10px 18px;
+  color: var(--locco-cream);
+  font-size: 0.9rem;
+  font-weight: 1000;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.locco-v2-nav nav a:hover {
+  background: rgba(255, 245, 207, 0.11);
+}
+
+.locco-v2-nav-order {
+  color: #1b1408;
+  background: linear-gradient(135deg, var(--locco-gold), var(--locco-orange));
+  box-shadow: 0 18px 40px rgba(255, 122, 22, 0.28);
+}
+
+.locco-v2-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(430px, 0.82fr) minmax(500px, 1.18fr);
+  align-items: center;
+  gap: clamp(24px, 5vw, 80px);
+  min-height: 0;
+}
+
+.locco-v2-copy {
+  display: grid;
+  align-content: center;
+  gap: 24px;
+  max-width: 650px;
+}
+
+.locco-v2-kicker {
+  margin: 0;
+  color: var(--locco-gold);
+  font-size: 0.88rem;
+  font-weight: 1000;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+
+.locco-v2-copy h1 {
+  margin: 0;
+  max-width: 620px;
+  color: var(--locco-cream);
+  font-size: clamp(4.2rem, 8.4vw, 8.8rem);
+  font-weight: 1000;
+  letter-spacing: -0.075em;
+  line-height: 0.88;
+  text-shadow: 0 5px 0 rgba(0,0,0,0.34);
+}
+
+.locco-v2-subtitle {
+  max-width: 570px;
+  margin: 0;
+  color: rgba(255, 245, 207, 0.82);
+  font-size: clamp(1.05rem, 1.35vw, 1.28rem);
+  font-weight: 850;
+  line-height: 1.65;
+}
+
+.locco-v2-rating-card {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 440px);
+  border: 1px solid rgba(255, 196, 41, 0.28);
+  border-radius: 18px;
+  padding: 18px 20px;
+  color: #0b2d1e;
+  background: linear-gradient(135deg, #fff8db, #fff0bf);
+  box-shadow: 0 24px 45px rgba(0, 0, 0, 0.24);
+}
+
+.locco-v2-rating-card span {
+  color: #dc7a08;
+  font-size: 0.98rem;
+  font-weight: 1000;
+}
+
+.locco-v2-rating-card strong {
+  color: #0a2418;
+  font-size: clamp(1.45rem, 2vw, 2rem);
+  font-weight: 1000;
+  letter-spacing: -0.04em;
+}
+
+.locco-v2-rating-card b {
+  color: rgba(11, 45, 30, 0.68);
+}
+
+.locco-v2-actions,
+.locco-v2-location-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.locco-v2-primary,
+.locco-v2-secondary {
+  display: inline-flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 14px 28px;
+  font-size: 1rem;
+  font-weight: 1000;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.locco-v2-primary {
+  color: #1b1408;
+  background: linear-gradient(135deg, var(--locco-gold), var(--locco-orange));
+  box-shadow: 0 18px 42px rgba(255, 122, 22, 0.32);
+}
+
+.locco-v2-secondary {
+  border: 1px solid rgba(255, 245, 207, 0.26);
+  color: var(--locco-cream);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.locco-v2-product {
+  position: relative;
+  min-height: clamp(520px, 64vh, 780px);
+}
+
+.locco-v2-product::before {
+  position: absolute;
+  inset: 9% 0 4% 3%;
+  border-radius: 46% 54% 60% 40%;
+  background:
+    radial-gradient(circle at 46% 36%, rgba(255, 222, 115, 0.75), transparent 18%),
+    radial-gradient(circle at center, rgba(255, 122, 22, 0.88), rgba(130, 60, 18, 0.72) 62%, transparent 63%);
+  content: "";
+  filter: drop-shadow(0 36px 54px rgba(0,0,0,0.33));
+}
+
+.locco-v2-label-card {
+  position: absolute;
+  z-index: 3;
+  top: 13%;
+  left: 12%;
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+  border-radius: 18px;
+  padding: 18px 22px;
+  color: #954019;
+  background: #fff4cf;
+  box-shadow: 0 22px 36px rgba(0,0,0,0.2);
+  transform: rotate(-7deg);
+}
+
+.locco-v2-label-card span {
+  color: #e06116;
+  font-size: 1.1rem;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.locco-v2-label-card strong {
+  color: #293d20;
+  font-size: 0.95rem;
+}
+
+.locco-v2-burger-photo {
+  position: absolute;
+  z-index: 2;
+  right: -4%;
+  bottom: 1%;
+  width: min(96%, 780px);
+  height: min(78%, 590px);
+  filter: drop-shadow(0 42px 50px rgba(0, 0, 0, 0.34));
+}
+
+.locco-v2-burger-photo > span,
+.locco-v2-burger-shadow {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.locco-v2-board {
+  z-index: 0;
+  bottom: 1%;
+  width: 72%;
+  height: 18%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #a96b2b, #6e3a18);
+  box-shadow: inset 0 8px 12px rgba(255,255,255,0.14);
+}
+
+.locco-v2-burger-shadow {
+  z-index: 1;
+  bottom: 10%;
+  width: 60%;
+  height: 10%;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.35);
+  filter: blur(12px);
+}
+
+.locco-v2-bun.top {
+  z-index: 8;
+  top: 16%;
+  width: 58%;
+  height: 27%;
+  border-radius: 52% 52% 24% 24%;
+  background:
+    radial-gradient(circle at 24% 30%, #fff1ad 0 2%, transparent 3%),
+    radial-gradient(circle at 42% 20%, #fff1ad 0 2%, transparent 3%),
+    radial-gradient(circle at 62% 31%, #fff1ad 0 2%, transparent 3%),
+    linear-gradient(180deg, #f6c466 0%, #db8b32 75%);
+}
+
+.locco-v2-sesame {
+  z-index: 9;
+  width: 12px;
+  height: 5px;
+  border-radius: 999px;
+  background: #fff4bf;
+}
+.locco-v2-sesame.s1 { top: 24%; left: 42%; transform: rotate(7deg); }
+.locco-v2-sesame.s2 { top: 21%; left: 55%; transform: rotate(-2deg); }
+.locco-v2-sesame.s3 { top: 28%; left: 67%; transform: rotate(9deg); }
+
+.locco-v2-lettuce {
+  z-index: 7;
+  top: 42%;
+  width: 70%;
+  height: 10%;
+  border-radius: 40% 60% 45% 55%;
+  background: linear-gradient(90deg, #5ca43b, #8fca50, #4b8d2f);
+}
+
+.locco-v2-cheese {
+  z-index: 6;
+  top: 49%;
+  width: 60%;
+  height: 9%;
+  clip-path: polygon(0 0, 100% 0, 86% 100%, 72% 34%, 55% 100%, 36% 38%, 20% 100%);
+  background: #ffc732;
+}
+
+.locco-v2-meat {
+  z-index: 5;
+  top: 55%;
+  width: 62%;
+  height: 16%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6b2c17, #2c120b);
+  box-shadow: inset 0 7px 0 rgba(255,255,255,0.06);
+}
+
+.locco-v2-onion {
+  z-index: 6;
+  top: 62%;
+  width: 58%;
+  height: 9%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #a75416, #55210d, #d07820);
+}
+
+.locco-v2-bun.bottom {
+  z-index: 4;
+  top: 68%;
+  width: 58%;
+  height: 15%;
+  border-radius: 18% 18% 46% 46%;
+  background: linear-gradient(180deg, #f2ac42, #ce771c);
+}
+
+.locco-v2-dots {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  padding-bottom: 4px;
+}
+
+.locco-v2-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 245, 207, 0.75);
+}
+
+.locco-v2-info-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  padding: 28px 0 18px;
+}
+
+.locco-v2-info-strip article,
+.locco-v2-story,
+.locco-v2-location {
+  border: 1px solid rgba(255, 245, 207, 0.16);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 24px 50px rgba(0,0,0,0.16);
+  backdrop-filter: blur(16px);
+}
+
+.locco-v2-info-strip article {
+  display: grid;
+  gap: 10px;
+  min-height: 170px;
+  padding: 24px;
+}
+
+.locco-v2-info-strip span {
+  color: var(--locco-gold);
+  font-weight: 1000;
+}
+
+.locco-v2-info-strip strong {
+  font-size: 1.25rem;
+  font-weight: 1000;
+}
+
+.locco-v2-info-strip p,
+.locco-v2-story p,
+.locco-v2-location p {
+  margin: 0;
+  color: rgba(255, 245, 207, 0.75);
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.locco-v2-story,
+.locco-v2-location {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: 28px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 34px;
+}
+
+.locco-v2-story h2,
+.locco-v2-location h2 {
+  margin: 10px 0 0;
+  max-width: 650px;
+  color: var(--locco-cream);
+  font-size: clamp(2rem, 3vw, 3.4rem);
+  font-weight: 1000;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+
+.locco-v2-location {
+  margin-bottom: 56px;
+}
+
+.locco-v2-location-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 980px) {
+  .locco-v2-hero,
+  .locco-v2-info-strip,
+  .locco-v2-story,
+  .locco-v2-location {
+    width: min(100% - 32px, 560px);
+  }
+
+  .locco-v2-hero {
+    min-height: auto;
+    padding-top: 18px;
+  }
+
+  .locco-v2-nav {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .locco-v2-nav nav,
+  .locco-v2-nav-order {
+    display: none;
+  }
+
+  .locco-v2-brand .brand-logo,
+  .locco-v2-brand .brand-logo img {
+    width: 58px;
+    height: 58px;
+  }
+
+  .locco-v2-hero-grid,
+  .locco-v2-story,
+  .locco-v2-location,
+  .locco-v2-info-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .locco-v2-copy h1 {
+    font-size: clamp(3.4rem, 16vw, 5.6rem);
+  }
+
+  .locco-v2-product {
+    min-height: 410px;
+    order: -1;
+    margin-top: 14px;
+  }
+
+  .locco-v2-product::before {
+    inset: 8% -4% 6%;
+  }
+
+  .locco-v2-burger-photo {
+    right: -18%;
+    bottom: 0;
+    width: 122%;
+    height: 85%;
+  }
+
+  .locco-v2-label-card {
+    top: 3%;
+    left: 4%;
+    min-width: 160px;
+    padding: 14px 16px;
+  }
+
+  .locco-v2-rating-card {
+    width: 100%;
+  }
+
+  .locco-v2-actions,
+  .locco-v2-location-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .locco-v2-primary,
+  .locco-v2-secondary {
+    width: 100%;
+  }
+}
