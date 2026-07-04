@@ -4,10 +4,11 @@ export function createDeliveryCustomer(customer) {
   return {
     id: Date.now(),
     name: customer.name,
+    email: customer.email ?? '',
     phone: customer.phone,
     address: customer.address,
     notes: customer.notes,
-    tags: ['Novo'],
+    tags: customer.tags?.length ? customer.tags : ['Novo'],
   }
 }
 
@@ -45,7 +46,8 @@ export function createDeliveryOrder({ order, customers, deliveries, products }) 
   if (items.length === 0) return null
 
   const subtotal = items.reduce((sum, item) => sum + item.total, 0)
-  const total = Math.max(0, subtotal - discount)
+  const deliveryFee = Number(order.deliveryFee || 0)
+  const total = Math.max(0, subtotal - discount + deliveryFee)
 
   return {
     id: `#D-${String(deliveries.length + 1052).padStart(4, '0')}`,
@@ -54,10 +56,19 @@ export function createDeliveryOrder({ order, customers, deliveries, products }) 
     channel: order.channel,
     status: 'novo',
     total,
+    subtotal,
+    deliveryFee,
     eta: '35 min',
     address: customer.address,
+    phone: customer.phone,
     campaign: order.campaign,
     discount,
+    paymentMethod: order.paymentMethod ?? 'entrega',
+    paymentStatus: order.paymentStatus ?? 'pendente',
+    paymentLabel: order.paymentLabel ?? '',
+    payOnDelivery: Boolean(order.payOnDelivery),
+    cashChangeFor: Number(order.cashChangeFor || 0),
+    clientDeliveryOrderId: order.clientDeliveryOrderId ?? null,
     createdAt: Date.now(),
     items,
   }

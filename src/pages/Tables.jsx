@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
+import { formatLocalDateLabel, getLocalDateKey, getTodayLocalDateKey } from '../lib/dateUtils.js'
 import { checkProductStockAvailability } from '../lib/inventoryRepository.js'
 import {
   additionOptions,
@@ -15,6 +16,29 @@ import {
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const allCategoriesLabel = 'Todos'
+const quickPaymentMethods = [
+  { id: 'pix', label: 'Pix' },
+  { id: 'debito', label: 'Debito' },
+  { id: 'credito', label: 'Credito' },
+  { id: 'dinheiro', label: 'Dinheiro' },
+]
+const tablesDraftStorageKey = 'loccoburger_admin_tables_draft_v1'
+
+function loadTablesDraft() {
+  if (typeof window === 'undefined') return {}
+
+  try {
+    const parsedDraft = JSON.parse(window.localStorage.getItem(tablesDraftStorageKey) ?? '{}')
+    return parsedDraft && typeof parsedDraft === 'object' ? parsedDraft : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveTablesDraft(draft) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(tablesDraftStorageKey, JSON.stringify(draft))
+}
 
 function CollapsibleSection({ badge, children, expandedSections, id, onToggle, title }) {
   const isExpanded = expandedSections[id]
@@ -84,48 +108,81 @@ function createEmptySelectedModifiers() {
 }
 
 export function Tables({
+  clientQrOrders = [],
   inventoryItems,
   kitchenOrders = [],
   onAddTableItem,
   onAddTableGuest,
+  onApproveClientQrOrder,
+  onCreateFixedQrTable,
   onCreateTableSession,
+  onDeleteTable,
   onOpenTable,
+  onRejectClientQrOrder,
   onRemoveTableItem,
   onRequestTableClose,
+  onQuickSale,
   onUpdateTableItemQuantity,
+  payments = [],
   products,
   tables,
   technicalSheets,
 }) {
-  const [selectedTableId, setSelectedTableId] = useState(tables.find((table) => table.status !== 'livre')?.id ?? tables[0]?.id ?? 1)
-  const [openTableForm, setOpenTableForm] = useState({
+  const savedDraft = useMemo(() => loadTablesDraft(), [])
+  const initialOpenTableForm = {
     tableNumber: '',
     customerName: '',
+    customerPhone: '',
     attendant: '',
-  })
-  const [orderForm, setOrderForm] = useState({
+    ...(savedDraft.openTableForm ?? {}),
+  }
+  const initialQuickSaleForm = {
+    productId: products.find((product) => product.active)?.id ?? '',
+    quantity: 1,
+    paymentMethod: 'pix',
+    customerName: '',
+    ...(savedDraft.quickSaleForm ?? {}),
+  }
+  const initialOrderForm = {
     productId: products.find((product) => product.active)?.id ?? '',
     quantity: 1,
     notes: '',
     modifiers: emptyModifiers,
-  })
-  const [selectedCategory, setSelectedCategory] = useState(allCategoriesLabel)
-  const [guestName, setGuestName] = useState('')
+    ...(savedDraft.orderForm ?? {}),
+    modifiers: savedDraft.orderForm?.modifiers ?? emptyModifiers,
+  }
+  const [selectedTableId, setSelectedTableId] = useState(tables.find((table) => table.status !== 'livre')?.id ?? tables[0]?.id ?? 1)
+  const [openTableForm, setOpenTableForm] = useState(initialOpenTableForm)
+  const [fixedTableNumber, setFixedTableNumber] = useState(savedDraft.fixedTableNumber ?? '')
+  const [quickSaleForm, setQuickSaleForm] = useState(initialQuickSaleForm)
+  const [orderForm, setOrderForm] = useState(initialOrderForm)
+  const [selectedCategory, setSelectedCategory] = useState(savedDraft.selectedCategory ?? allCategoriesLabel)
+  const [guestName, setGuestName] = useState(savedDraft.guestName ?? '')
+  const [guestPhone, setGuestPhone] = useState(savedDraft.guestPhone ?? '')
   const [selectedTabId, setSelectedTabId] = useState('')
+  const [historySearch, setHistorySearch] = useState(savedDraft.historySearch ?? '')
+  const [historyDateFilter, setHistoryDateFilter] = useState(savedDraft.historyDateFilter ?? getTodayLocalDateKey())
   const [orderMessage, setOrderMessage] = useState(null)
+  const [qrOrderMessage, setQrOrderMessage] = useState(null)
+  const [quickSaleMessage, setQuickSaleMessage] = useState(null)
+  const [quickSaleLoading, setQuickSaleLoading] = useState(false)
   const [pendingOverride, setPendingOverride] = useState(null)
   const [pendingSentOverride, setPendingSentOverride] = useState(null)
-  const [draftItemsByTable, setDraftItemsByTable] = useState({})
-  const [quickSelections, setQuickSelections] = useState({})
+  const [draftItemsByTable, setDraftItemsByTable] = useState(savedDraft.draftItemsByTable ?? {})
+  const [quickSelections, setQuickSelections] = useState(savedDraft.quickSelections ?? {})
   const [isSendingToKitchen, setIsSendingToKitchen] = useState(false)
   const [kitchenFeedback, setKitchenFeedback] = useState(null)
   const [expandedSections, setExpandedSections] = useState({
     open: true,
+    fixedQr: false,
+    quickSale: true,
+    qr: true,
     tables: true,
     tabs: true,
     menu: true,
     draft: true,
     sent: false,
+    history: false,
   })
 
   const selectedTable = useMemo(
@@ -142,6 +199,7 @@ export function Tables({
     ? activeProducts
     : activeProducts.filter((product) => product.category === selectedCategory)
   const selectedProduct = activeProducts.find((product) => product.id === Number(orderForm.productId))
+  const selectedQuickSaleProduct = activeProducts.find((product) => product.id === Number(quickSaleForm.productId))
   const selectedModifiers = getSelectedOrderModifiers(orderForm.modifiers)
   const modifierSummary = getModifierSummary(selectedModifiers)
   const modifiersUnitTotal = getModifiersUnitTotal(selectedModifiers)
@@ -152,6 +210,10 @@ export function Tables({
     : [{ id: `${selectedTable?.id ?? 0}-mesa`, name: 'Mesa', orderItems: selectedTable?.orderItems ?? [] }]
   const selectedTab = tableTabs.find((tab) => tab.id === selectedTabId) ?? tableTabs[0]
   const selectedDraftItems = draftItemsByTable[selectedTable?.id] ?? []
+  const selectedTableQrNumber = String(selectedTable?.tableNumber ?? selectedTable?.id ?? '').trim()
+  const selectedTableQrUrl = selectedTableQrNumber && typeof window !== 'undefined'
+    ? `${window.location.origin}/mesa/${selectedTableQrNumber}`
+    : ''
   const selectedDraftTotal = selectedDraftItems.reduce((total, item) => total + item.total, 0)
   const selectedQuickEntries = Object.entries(quickSelections)
     .map(([productId, quantity]) => ({
@@ -163,6 +225,43 @@ export function Tables({
     (total, entry) => total + entry.product.price * entry.quantity,
     0,
   )
+  const pendingQrOrders = clientQrOrders.filter((order) => order.status === 'novo')
+  const processedQrOrders = clientQrOrders.filter((order) => order.status !== 'novo')
+  const visibleProcessedQrOrders = processedQrOrders.slice(0, 30)
+  const fixedQrTables = tables.filter((table) => table.fixedQr)
+  const tableHistoryPayments = useMemo(() => {
+    const normalizedSearch = historySearch
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+
+    return payments
+      .filter((payment) => {
+        const source = String(payment.source ?? 'mesa')
+        return source === 'mesa' || source === 'caderneta' || (!payment.source && payment.tableId)
+      })
+      .filter((payment) => {
+        const dateKey = getLocalDateKey(payment.paidAtIso || payment.createdAtIso || payment.paidAt)
+        const matchesDate = historyDateFilter === 'todos' || dateKey === historyDateFilter
+        const itemsText = (payment.items ?? []).map((item) => `${item.quantity}x ${item.name}`).join(' ')
+        const haystack = `${payment.tableId ?? ''} ${payment.tabName ?? ''} ${payment.customerName ?? ''} ${payment.method ?? ''} ${itemsText}`
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+
+        return matchesDate && (!normalizedSearch || haystack.includes(normalizedSearch))
+      })
+      .slice(0, 200)
+  }, [historyDateFilter, historySearch, payments])
+  const tableHistoryDateOptions = useMemo(() => {
+    return Array.from(new Set(payments
+      .filter((payment) => {
+        const source = String(payment.source ?? 'mesa')
+        return source === 'mesa' || source === 'caderneta' || (!payment.source && payment.tableId)
+      })
+      .map((payment) => getLocalDateKey(payment.paidAtIso || payment.createdAtIso || payment.paidAt))
+      .filter(Boolean)))
+  }, [payments])
   const tabSummaries = tableTabs.map((tab) => ({
     ...tab,
     total: (tab.orderItems ?? []).reduce((sum, item) => sum + item.total, 0),
@@ -179,6 +278,10 @@ export function Tables({
     if (activeProducts.length === 0) return
 
     setOrderForm((currentForm) => {
+      const currentProductStillActive = activeProducts.some((product) => product.id === Number(currentForm.productId))
+      return currentProductStillActive ? currentForm : { ...currentForm, productId: activeProducts[0].id }
+    })
+    setQuickSaleForm((currentForm) => {
       const currentProductStillActive = activeProducts.some((product) => product.id === Number(currentForm.productId))
       return currentProductStillActive ? currentForm : { ...currentForm, productId: activeProducts[0].id }
     })
@@ -204,6 +307,34 @@ export function Tables({
 
     return () => window.clearTimeout(timer)
   }, [kitchenFeedback])
+
+  useEffect(() => {
+    saveTablesDraft({
+      openTableForm,
+      fixedTableNumber,
+      quickSaleForm,
+      orderForm,
+      selectedCategory,
+      guestName,
+      guestPhone,
+      historySearch,
+      historyDateFilter,
+      draftItemsByTable,
+      quickSelections,
+    })
+  }, [
+    openTableForm,
+    fixedTableNumber,
+    quickSaleForm,
+    orderForm,
+    selectedCategory,
+    guestName,
+    guestPhone,
+    historySearch,
+    historyDateFilter,
+    draftItemsByTable,
+    quickSelections,
+  ])
 
   function getKitchenCustomerLabel() {
     const tabName = String(selectedTab?.name ?? '').trim()
@@ -279,10 +410,10 @@ export function Tables({
 
     setSelectedTableId(table.id)
     setSelectedTabId(`${table.id}-mesa`)
-    setOpenTableForm({ tableNumber: '', customerName: '', attendant: '' })
+    setOpenTableForm({ tableNumber: '', customerName: '', customerPhone: '', attendant: '' })
     setExpandedSections((currentSections) => ({
       ...currentSections,
-      tables: false,
+      tables: true,
       tabs: true,
       menu: true,
       draft: true,
@@ -294,6 +425,111 @@ export function Tables({
     if (!selectedTable) return
     onOpenTable(selectedTable.id)
     setOrderMessage({ ok: true, message: `${getTableDisplayLabel(selectedTable)} aberta.` })
+  }
+
+  function handleRequestSelectedTableClose() {
+    if (!selectedTable) return
+    const result = onRequestTableClose?.(selectedTable.id)
+    setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel solicitar fechamento desta mesa.' })
+  }
+
+  function handleCreateFixedQrTable(event) {
+    event.preventDefault()
+
+    const result = onCreateFixedQrTable?.(fixedTableNumber)
+    setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel criar esta mesa fixa.' })
+
+    if (result?.ok) {
+      setFixedTableNumber('')
+      if (result.table?.id) setSelectedTableId(result.table.id)
+    }
+  }
+
+  function handleDeleteSelectedTable() {
+    if (!selectedTable || !onDeleteTable) return
+    if (!window.confirm(`Excluir ${getTableDisplayLabel(selectedTable)} da lista de mesas/comandas?`)) return
+
+    const result = onDeleteTable(selectedTable.id)
+    setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel excluir esta mesa.' })
+  }
+
+  async function handleQuickSaleSubmit(event) {
+    event.preventDefault()
+    if (quickSaleLoading) return
+
+    const quickSalePayload = {
+      ...quickSaleForm,
+      productId: Number(quickSaleForm.productId),
+      quantity: Number(quickSaleForm.quantity),
+    }
+    setQuickSaleLoading(true)
+    setKitchenFeedback({
+      type: 'loading',
+      scope: 'Caixa',
+      title: 'Registrando venda rapida...',
+      message: 'Salvando no caixa, atualizando estoque e financeiro.',
+    })
+
+    let result = null
+    try {
+      ;[result] = await Promise.all([
+        Promise.resolve(onQuickSale?.(quickSalePayload)),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+    } catch (error) {
+      result = { ok: false, message: error?.message ?? 'Nao foi possivel registrar a venda rapida.' }
+    }
+
+    setQuickSaleMessage(result ?? { ok: false, message: 'Nao foi possivel registrar a venda rapida.' })
+    setQuickSaleLoading(false)
+    setKitchenFeedback({
+      type: result?.ok ? 'success' : 'error',
+      title: result?.ok ? 'Venda registrada!' : 'Venda nao registrada',
+      message: result?.message ?? 'Nao foi possivel registrar a venda rapida.',
+    })
+
+    if (result?.ok) {
+      setQuickSaleForm((currentForm) => ({
+        ...currentForm,
+        quantity: 1,
+        customerName: '',
+      }))
+    }
+  }
+
+  async function handleApproveQrOrder(orderId, options = {}) {
+    setKitchenFeedback({
+      type: 'loading',
+      scope: 'QR Code',
+      title: 'Processando pedido QR...',
+      message: 'Salvando mesa, cozinha, estoque e atendimento.',
+    })
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onApproveClientQrOrder?.(orderId, options)),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      setQrOrderMessage(result ?? { ok: false, message: 'Nao foi possivel aprovar o pedido QR.' })
+      setKitchenFeedback({
+        type: result?.ok ? 'success' : 'error',
+        title: result?.ok ? 'Pedido QR processado!' : 'Pedido QR nao processado',
+        message: result?.message ?? 'Nao foi possivel aprovar o pedido QR.',
+      })
+    } catch (error) {
+      const message = error?.message ?? 'Nao foi possivel aprovar o pedido QR.'
+      setQrOrderMessage({ ok: false, message })
+      setKitchenFeedback({
+        type: 'error',
+        title: 'Pedido QR nao processado',
+        message,
+      })
+    }
+  }
+
+  function handleRejectQrOrder(orderId) {
+    const result = onRejectClientQrOrder?.(orderId)
+    setQrOrderMessage(result ?? { ok: false, message: 'Nao foi possivel recusar o pedido QR.' })
   }
 
   function toggleQuickProduct(product) {
@@ -412,12 +648,12 @@ export function Tables({
     const sentItemIds = []
 
     for (const item of itemsToSend) {
-      const result = onAddTableItem(item.tableId, item.productId, item.quantity, item.tabId, item.notes, {
+      const result = await Promise.resolve(onAddTableItem(item.tableId, item.productId, item.quantity, item.tabId, item.notes, {
         forceStock,
         manualNotes: item.manualNotes,
         modifiers: item.modifiers,
         unitPrice: item.unitPrice,
-      })
+      }))
 
       if (!result?.ok) {
         if (sentItemIds.length > 0) clearSentDraftItems(item.tableId, sentItemIds)
@@ -461,11 +697,12 @@ export function Tables({
   function handleAddGuest(event) {
     event.preventDefault()
 
-    const newTab = onAddTableGuest(selectedTable.id, guestName)
+    const newTab = onAddTableGuest(selectedTable.id, { name: guestName, phone: guestPhone })
     if (!newTab) return
 
     setSelectedTabId(newTab.id)
     setGuestName('')
+    setGuestPhone('')
   }
 
   function toggleRemoval(removal) {
@@ -539,7 +776,7 @@ export function Tables({
         <div className="kitchen-feedback-overlay" role="status" aria-live="polite">
           <div className="kitchen-feedback-modal">
             <span className="kitchen-feedback-spinner" aria-hidden="true" />
-            <p className="eyebrow">Cozinha</p>
+            <p className="eyebrow">{kitchenFeedback.scope ?? 'Cozinha'}</p>
             <h3>{kitchenFeedback.title}</h3>
             <p>{kitchenFeedback.message}</p>
           </div>
@@ -582,6 +819,15 @@ export function Tables({
               />
             </label>
             <label>
+              Telefone
+              <input
+                inputMode="tel"
+                value={openTableForm.customerPhone}
+                onChange={(event) => setOpenTableForm((currentForm) => ({ ...currentForm, customerPhone: event.target.value }))}
+                placeholder="Ex.: (11) 99999-9999"
+              />
+            </label>
+            <label>
               Garcom
               <input
                 value={openTableForm.attendant}
@@ -591,6 +837,182 @@ export function Tables({
             </label>
             <button className="primary-button" type="submit">Abrir comanda</button>
           </form>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          badge={`${fixedQrTables.length} QR`}
+          expandedSections={expandedSections}
+          id="fixedQr"
+          title="Mesa fixa / QR Code"
+          onToggle={toggleSection}
+        >
+          <form className="fixed-qr-form" onSubmit={handleCreateFixedQrTable}>
+            <label>
+              Nova mesa fixa
+              <input
+                value={fixedTableNumber}
+                onChange={(event) => setFixedTableNumber(event.target.value)}
+                placeholder="Ex.: 5"
+              />
+            </label>
+            <button className="secondary-button" type="submit">Criar QR da mesa</button>
+          </form>
+          <div className="fixed-qr-list">
+            {fixedQrTables.map((table) => {
+              const tableNumber = String(table.tableNumber ?? table.id).trim()
+              const qrUrl = typeof window !== 'undefined' ? `${window.location.origin}/mesa/${tableNumber}` : `/mesa/${tableNumber}`
+
+              return (
+                <button
+                  className={`fixed-qr-row ${selectedTable?.id === table.id ? 'active' : ''}`}
+                  key={table.id}
+                  type="button"
+                  onClick={() => setSelectedTableId(table.id)}
+                >
+                  <span>Mesa {tableNumber}</span>
+                  <small>{qrUrl}</small>
+                  <StatusBadge status={table.status} />
+                </button>
+              )
+            })}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          badge="Sem mesa"
+          expandedSections={expandedSections}
+          id="quickSale"
+          title="Venda rapida / balcao"
+          onToggle={toggleSection}
+        >
+          <form className="quick-sale-form" onSubmit={handleQuickSaleSubmit}>
+            <label>
+              Produto
+              <select
+                value={quickSaleForm.productId}
+                onChange={(event) => setQuickSaleForm((form) => ({ ...form, productId: Number(event.target.value) }))}
+              >
+                {activeProducts.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name} - {currency.format(product.price)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="form-grid">
+              <label>
+                Quantidade
+                <input
+                  inputMode="numeric"
+                  min="1"
+                  type="number"
+                  value={quickSaleForm.quantity}
+                  onChange={(event) => setQuickSaleForm((form) => ({ ...form, quantity: event.target.value }))}
+                />
+              </label>
+              <label>
+                Pagamento
+                <select
+                  value={quickSaleForm.paymentMethod}
+                  onChange={(event) => setQuickSaleForm((form) => ({ ...form, paymentMethod: event.target.value }))}
+                >
+                  {quickPaymentMethods.map((method) => (
+                    <option key={method.id} value={method.id}>{method.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label>
+              Nome opcional
+              <input
+                value={quickSaleForm.customerName}
+                onChange={(event) => setQuickSaleForm((form) => ({ ...form, customerName: event.target.value }))}
+                placeholder="Ex.: Balcao, retirada, cliente"
+              />
+            </label>
+            {selectedQuickSaleProduct && (
+              <div className="form-hint">
+                Total rapido: {currency.format(selectedQuickSaleProduct.price * Number(quickSaleForm.quantity || 0))}. Ideal para agua, refrigerante ou venda avulsa.
+              </div>
+            )}
+            {quickSaleMessage && (
+              <div className={quickSaleMessage.ok ? 'form-hint' : 'form-alert'}>{quickSaleMessage.message}</div>
+            )}
+            <button className="primary-button" disabled={quickSaleLoading} type="submit">
+              {quickSaleLoading ? 'Registrando no sistema...' : 'Registrar venda rapida'}
+            </button>
+          </form>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          badge={`${pendingQrOrders.length} novo(s)`}
+          expandedSections={expandedSections}
+          id="qr"
+          title="Pedidos QR aguardando"
+          onToggle={toggleSection}
+        >
+          <div className="qr-orders-panel">
+            {qrOrderMessage && (
+              <div className={qrOrderMessage.ok ? 'form-hint' : 'form-alert'}>{qrOrderMessage.message}</div>
+            )}
+
+            {pendingQrOrders.length === 0 ? (
+              <p className="empty-state">Nenhum pedido de cliente aguardando aprovacao.</p>
+            ) : pendingQrOrders.map((order) => (
+              <article className="qr-order-card" key={order.id}>
+                <div className="qr-order-card-top">
+                  <div>
+                    <span>{order.type === 'fechamento' ? 'Fechamento' : 'Pedido'}</span>
+                    <strong>Mesa {order.tableNumber} - {order.customerName}</strong>
+                    <small>{order.phone}</small>
+                  </div>
+                  <b>{currency.format(order.total || 0)}</b>
+                </div>
+
+                {order.items?.length > 0 && (
+                  <div className="qr-order-items">
+                    {order.items.map((item) => (
+                      <span key={item.id}>{item.quantity}x {item.name}</span>
+                    ))}
+                  </div>
+                )}
+                {order.notes && <small className="qr-order-note">{order.notes}</small>}
+
+                <div className="row-actions">
+                  <button className="primary-button" type="button" onClick={() => handleApproveQrOrder(order.id)}>
+                    {order.type === 'fechamento' ? 'Enviar para fechamento' : 'Aprovar e enviar'}
+                  </button>
+                  {order.type !== 'fechamento' && (
+                    <button className="ghost-button" type="button" onClick={() => handleApproveQrOrder(order.id, { forceStock: true })}>
+                      Enviar sem estoque
+                    </button>
+                  )}
+                  <button className="ghost-button danger-button" type="button" onClick={() => handleRejectQrOrder(order.id)}>
+                    Recusar
+                  </button>
+                </div>
+              </article>
+            ))}
+
+            {processedQrOrders.length > 0 && (
+              <details className="qr-processed-list">
+                <summary>
+                  <strong>Ultimos processados</strong>
+                  <span>{processedQrOrders.length} registro(s)</span>
+                </summary>
+                <div className="qr-processed-scroll">
+                  {visibleProcessedQrOrders.map((order) => (
+                    <span key={order.id}>
+                      Mesa {order.tableNumber} - {order.customerName}: {order.status}
+                    </span>
+                  ))}
+                </div>
+                {processedQrOrders.length > visibleProcessedQrOrders.length && (
+                  <small>Mostrando os 30 mais recentes para manter a tela leve.</small>
+                )}
+              </details>
+            )}
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection
@@ -616,6 +1038,82 @@ export function Tables({
             ))}
           </div>
         </CollapsibleSection>
+
+        <CollapsibleSection
+          badge={`${tableHistoryPayments.length} registro(s)`}
+          expandedSections={expandedSections}
+          id="history"
+          title="Historico de mesas/comandas"
+          onToggle={toggleSection}
+        >
+          <div className="table-history-toolbar">
+            <label>
+              Buscar
+              <input
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+                placeholder="Mesa, cliente, item ou pagamento"
+              />
+            </label>
+            <label>
+              Dia
+              <select value={historyDateFilter} onChange={(event) => setHistoryDateFilter(event.target.value)}>
+                <option value="todos">Todos os dias</option>
+                <option value={getTodayLocalDateKey()}>Hoje</option>
+                {tableHistoryDateOptions
+                  .filter((dateKey) => dateKey !== getTodayLocalDateKey())
+                  .map((dateKey) => (
+                    <option key={dateKey} value={dateKey}>{formatLocalDateLabel(dateKey)}</option>
+                  ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="responsive-table table-history-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Mesa/comanda</th>
+                  <th>Itens</th>
+                  <th>Forma</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableHistoryPayments.length === 0 ? (
+                  <tr>
+                    <td colSpan="5">Nenhuma mesa/comanda finalizada nos filtros atuais.</td>
+                  </tr>
+                ) : tableHistoryPayments.map((payment) => {
+                  const dateKey = getLocalDateKey(payment.paidAtIso || payment.createdAtIso || payment.paidAt)
+                  const itemsSummary = (payment.items ?? [])
+                    .map((item) => `${item.quantity}x ${item.name}`)
+                    .join(', ')
+
+                  return (
+                    <tr key={payment.id}>
+                      <td>
+                        <strong>{formatLocalDateLabel(dateKey)}</strong>
+                        <span className="muted">{payment.time ?? ''}</span>
+                      </td>
+                      <td>
+                        <strong>{payment.tableId ? `Mesa ${payment.tableId}` : 'Comanda'}</strong>
+                        <span className="muted">{payment.tabName ?? payment.customerName ?? 'Mesa inteira'}</span>
+                      </td>
+                      <td>{itemsSummary || 'Sem itens detalhados'}</td>
+                      <td>{payment.method ?? '-'}</td>
+                      <td>{currency.format(Number(payment.amount ?? payment.netAmount ?? 0))}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {tableHistoryPayments.length >= 200 && (
+            <small className="muted">Mostrando os 200 registros mais recentes do filtro para manter a tela leve.</small>
+          )}
+        </CollapsibleSection>
       </section>
 
       <Card className="order-panel waiter-order-panel">
@@ -624,6 +1122,11 @@ export function Tables({
             <p className="eyebrow">Atendimento</p>
             <h2>{getTableDisplayLabel(selectedTable)}</h2>
             <small>{getTableSupportLabel(selectedTable)}</small>
+            {selectedTableQrUrl && (
+              <a className="table-qr-link" href={selectedTableQrUrl} target="_blank" rel="noreferrer">
+                QR da mesa: {selectedTableQrUrl}
+              </a>
+            )}
           </div>
           <StatusBadge status={selectedTable.status} />
         </div>
@@ -641,8 +1144,20 @@ export function Tables({
           <button className="secondary-button" type="button" onClick={handleOpenSelectedTable}>
             Abrir selecionada
           </button>
-          <button className="ghost-button" type="button" onClick={() => onRequestTableClose(selectedTable.id)}>
-            Solicitar fechamento
+          <button
+            className="ghost-button"
+            disabled={selectedTable.status === 'fechamento' && Number(selectedTable.total || 0) > 0}
+            type="button"
+            onClick={handleRequestSelectedTableClose}
+          >
+            {selectedTable.status === 'fechamento' && Number(selectedTable.total || 0) > 0
+              ? 'Fechamento solicitado'
+              : Number(selectedTable.total || 0) <= 0
+                ? 'Liberar sem consumo'
+                : 'Solicitar fechamento'}
+          </button>
+          <button className="ghost-button danger-button" type="button" onClick={handleDeleteSelectedTable}>
+            Excluir mesa/comanda
           </button>
         </div>
 
@@ -671,6 +1186,12 @@ export function Tables({
               value={guestName}
               onChange={(event) => setGuestName(event.target.value)}
               placeholder="Nome da pessoa"
+            />
+            <input
+              inputMode="tel"
+              value={guestPhone}
+              onChange={(event) => setGuestPhone(event.target.value)}
+              placeholder="Telefone opcional"
             />
             <button className="secondary-button" type="submit">Adicionar pessoa</button>
           </form>

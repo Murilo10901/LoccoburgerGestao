@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
+import { formatLocalDateLabel, getLocalDateKey, getTodayLocalDateKey } from '../lib/dateUtils.js'
 import { getCustomerStats } from '../lib/deliveryRepository.js'
 import { checkProductStockAvailability } from '../lib/inventoryRepository.js'
 import {
@@ -24,6 +25,18 @@ const campaigns = [
   { id: 'combo15', label: 'Combo 15', discount: 15 },
 ]
 
+function getDeliveryDateKey(value) {
+  return getLocalDateKey(value)
+}
+
+function formatDeliveryDateLabel(dateKey) {
+  return formatLocalDateLabel(dateKey, {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
 function normalizeText(value) {
   return String(value ?? '')
     .normalize('NFD')
@@ -33,6 +46,28 @@ function normalizeText(value) {
 
 function normalizePhone(value) {
   return String(value ?? '').replace(/\D/g, '')
+}
+
+function getDeliveryTimestamp(order) {
+  const rawDate = order?.createdAt
+  if (typeof rawDate === 'number') return rawDate
+
+  const parsed = rawDate ? new Date(rawDate).getTime() : 0
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function getDeliveryPaymentLabel(order) {
+  const labels = {
+    pix: 'Pix na entrega',
+    credito: 'Credito na entrega',
+    debito: 'Debito na entrega',
+    dinheiro: 'Dinheiro na entrega',
+    entrega: 'Pagar na entrega',
+    link: 'Link Mercado Pago',
+  }
+
+  const label = order?.paymentLabel || labels[order?.paymentMethod] || order?.paymentMethod || 'Pendente'
+  return order?.cashChangeFor ? `${label} - troco para ${currency.format(order.cashChangeFor)}` : label
 }
 
 function escapeRegExp(value) {
@@ -56,12 +91,17 @@ function extractQuantityForProduct(normalizedMessage, normalizedProductName) {
 }
 
 export function Delivery({
+  clientDeliveryOrders = [],
   customers,
   deliveries,
   inventoryItems,
   onAddCustomer,
   onAdvanceOrder,
+  onApproveClientDeliveryOrder,
+  onClearClientDeliveryHistory,
+  onClearDeliveryQueue,
   onCreateOrder,
+  onRejectClientDeliveryOrder,
   onUpdateWhatsAppMessageStatus,
   products,
   technicalSheets,
@@ -80,9 +120,19 @@ export function Delivery({
   const [selectedCategory, setSelectedCategory] = useState(allCategoriesLabel)
   const [customerForm, setCustomerForm] = useState({ name: '', phone: '', address: '', notes: '' })
   const [orderMessage, setOrderMessage] = useState(null)
+  const [siteDeliveryMessage, setSiteDeliveryMessage] = useState(null)
+  const [pendingSiteDeliveryOverride, setPendingSiteDeliveryOverride] = useState(null)
   const [pendingOverride, setPendingOverride] = useState(null)
   const [orderItems, setOrderItems] = useState([])
   const [activeWhatsAppMessageId, setActiveWhatsAppMessageId] = useState(null)
+  const [selectedDeliveryOrderId, setSelectedDeliveryOrderId] = useState(null)
+  const [deliverySearch, setDeliverySearch] = useState('')
+  const [deliveryDateFilter, setDeliveryDateFilter] = useState('todos')
+  const [deliveryStatusFilter, setDeliveryStatusFilter] = useState('ativos')
+  const [deliveryActionLoading, setDeliveryActionLoading] = useState(null)
+  const [siteDeliveryActionLoading, setSiteDeliveryActionLoading] = useState(null)
+  const [deliveryClearLoading, setDeliveryClearLoading] = useState(null)
+  const [manualOrderLoading, setManualOrderLoading] = useState(false)
 
   const selectedCustomer = useMemo(
     () => customers.find((customer) => customer.id === Number(selectedCustomerId)) ?? customers[0],
@@ -116,6 +166,34 @@ export function Delivery({
     ['pendente', 'em_atendimento'].includes(message.status),
   )
   const pendingWhatsAppMessages = actionableWhatsAppMessages.filter((message) => message.status === 'pendente').length
+  const pendingClientDeliveryOrders = clientDeliveryOrders.filter((order) => order.status === 'novo')
+  const processedClientDeliveryOrders = clientDeliveryOrders.filter((order) => order.status !== 'novo').slice(0, 20)
+  const todayDateKey = getTodayLocalDateKey()
+  const deliveryDateOptions = Array.from(new Set([todayDateKey, ...deliveries.map((order) => getDeliveryDateKey(order.createdAt)).filter(Boolean)])).filter(Boolean)
+  const normalizedDeliverySearch = normalizeText(deliverySearch)
+  const visibleDeliveries = deliveries
+    .filter((order) => {
+      const orderDate = getDeliveryDateKey(order.createdAt)
+      const matchesDate = deliveryDateFilter === 'todos' || orderDate === deliveryDateFilter
+      const matchesStatus = deliveryStatusFilter === 'todos' ||
+        (deliveryStatusFilter === 'ativos' ? order.status !== 'entregue' : order.status === deliveryStatusFilter)
+      const matchesSearch = !normalizedDeliverySearch ||
+        normalizeText(`${order.id} ${order.customer} ${order.phone ?? ''} ${order.address} ${getDeliveryPaymentLabel(order)} ${(order.items ?? []).map((item) => item.name).join(' ')}`).includes(normalizedDeliverySearch)
+
+      return matchesDate && matchesStatus && matchesSearch
+    })
+    .sort((first, second) => getDeliveryTimestamp(second) - getDeliveryTimestamp(first))
+  const groupedDeliveries = visibleDeliveries.reduce((groups, order) => {
+    const dateKey = getDeliveryDateKey(order.createdAt) || 'sem-data'
+    const currentGroup = groups.find((group) => group.dateKey === dateKey)
+    if (currentGroup) {
+      currentGroup.orders.push(order)
+    } else {
+      groups.push({ dateKey, orders: [order] })
+    }
+    return groups
+  }, [])
+  const selectedDeliveryOrder = deliveries.find((order) => order.id === selectedDeliveryOrderId) ?? null
 
   function detectOrderItemsFromWhatsApp(messageBody) {
     const normalizedMessage = normalizeText(messageBody)
@@ -168,8 +246,9 @@ export function Delivery({
     setOrderItems((currentItems) => currentItems.filter((item) => item.draftId !== draftId))
   }
 
-  function handleCreateOrder(event) {
+  async function handleCreateOrder(event) {
     event.preventDefault()
+    if (manualOrderLoading) return
     if (!selectedCustomer) return
     if (orderItems.length === 0) {
       setOrderMessage({ ok: false, message: 'Adicione pelo menos um item antes de finalizar o pedido.' })
@@ -183,7 +262,21 @@ export function Delivery({
       discount: selectedCampaign.discount,
       items: orderItems,
     }
-    const result = onCreateOrder(payload)
+    setManualOrderLoading(true)
+    setOrderMessage({ ok: true, message: 'Salvando delivery, cozinha e estoque...' })
+
+    let result = null
+    try {
+      ;[result] = await Promise.all([
+        Promise.resolve(onCreateOrder(payload)),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+    } catch (error) {
+      result = { ok: false, message: error?.message ?? 'Nao foi possivel finalizar o pedido delivery.' }
+    } finally {
+      setManualOrderLoading(false)
+    }
+
     setOrderMessage(result)
     setPendingOverride(result?.needsOverride ? payload : null)
 
@@ -197,10 +290,94 @@ export function Delivery({
     }
   }
 
-  function handleForceCreateOrder() {
-    if (!pendingOverride) return
+  async function handleApproveSiteDelivery(orderId, forceStock = false) {
+    if (siteDeliveryActionLoading) return
 
-    const result = onCreateOrder(pendingOverride, { forceStock: true })
+    const actionKey = `${orderId}-${forceStock ? 'force' : 'normal'}`
+    setSiteDeliveryActionLoading(actionKey)
+    setSiteDeliveryMessage({ ok: true, message: 'Enviando pedido para a cozinha...' })
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onApproveClientDeliveryOrder?.(orderId, { forceStock })),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      setSiteDeliveryMessage(result ?? { ok: false, message: 'Nao foi possivel aprovar este pedido do site.' })
+      setPendingSiteDeliveryOverride(result?.needsOverride ? orderId : null)
+    } finally {
+      setSiteDeliveryActionLoading(null)
+    }
+  }
+
+  function handleRejectSiteDelivery(orderId) {
+    const result = onRejectClientDeliveryOrder?.(orderId)
+    setSiteDeliveryMessage(result ?? { ok: false, message: 'Nao foi possivel recusar este pedido do site.' })
+    if (pendingSiteDeliveryOverride === orderId) setPendingSiteDeliveryOverride(null)
+  }
+
+  async function handleAdvanceDeliveryQueueOrder(orderId) {
+    setDeliveryActionLoading(orderId)
+    try {
+      const result = await Promise.resolve(onAdvanceOrder?.(orderId))
+      if (result) setOrderMessage(result)
+    } catch (error) {
+      setOrderMessage({ ok: false, message: error?.message ?? 'Nao foi possivel avancar este pedido.' })
+    } finally {
+      setDeliveryActionLoading(null)
+    }
+  }
+
+  async function handleClearDeliveredQueue() {
+    if (!onClearDeliveryQueue) return
+
+    const dateKey = deliveryDateFilter === 'todos' ? '' : deliveryDateFilter
+    const dateLabel = dateKey ? ` de ${formatDeliveryDateLabel(dateKey)}` : ''
+    if (!window.confirm(`Limpar pedidos entregues${dateLabel} da fila de delivery?`)) return
+
+    setDeliveryClearLoading('deliveries')
+    try {
+      const result = await onClearDeliveryQueue({ status: 'entregue', dateKey })
+      setOrderMessage(result)
+    } finally {
+      setDeliveryClearLoading(null)
+    }
+  }
+
+  async function handleClearSiteHistory() {
+    if (!onClearClientDeliveryHistory) return
+
+    const dateKey = deliveryDateFilter === 'todos' ? '' : deliveryDateFilter
+    const dateLabel = dateKey ? ` de ${formatDeliveryDateLabel(dateKey)}` : ''
+    if (!window.confirm(`Limpar historico do site${dateLabel}? Pedidos novos aguardando aprovacao serao mantidos.`)) return
+
+    setDeliveryClearLoading('site-history')
+    try {
+      const result = await onClearClientDeliveryHistory({ dateKey })
+      setSiteDeliveryMessage(result)
+    } finally {
+      setDeliveryClearLoading(null)
+    }
+  }
+
+  async function handleForceCreateOrder() {
+    if (!pendingOverride) return
+    if (manualOrderLoading) return
+
+    setManualOrderLoading(true)
+    setOrderMessage({ ok: true, message: 'Salvando mesmo com alerta de estoque...' })
+
+    let result = null
+    try {
+      ;[result] = await Promise.all([
+        Promise.resolve(onCreateOrder(pendingOverride, { forceStock: true })),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+    } catch (error) {
+      result = { ok: false, message: error?.message ?? 'Nao foi possivel finalizar o pedido delivery.' }
+    } finally {
+      setManualOrderLoading(false)
+    }
+
     setOrderMessage(result)
     if (result?.ok) {
       if (activeWhatsAppMessageId && onUpdateWhatsAppMessageStatus) {
@@ -314,8 +491,8 @@ export function Delivery({
           <strong>{deliveredOrders}</strong>
         </Card>
         <Card className="stat-card">
-          <span>WhatsApp pendentes</span>
-          <strong>{pendingWhatsAppMessages}</strong>
+          <span>Ativos na fila</span>
+          <strong>{deliveries.filter((order) => order.status !== 'entregue').length}</strong>
         </Card>
         <Card className="stat-card">
           <span>Ticket medio</span>
@@ -323,44 +500,89 @@ export function Delivery({
         </Card>
       </section>
 
-      <Card className="wide-card">
+      <Card className="wide-card site-delivery-admin-card">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Integracao WhatsApp</p>
-            <h2>Entrada de mensagens</h2>
+            <p className="eyebrow">Site Delivery</p>
+            <h2>Pedidos online aguardando aprovacao</h2>
           </div>
-          <span className="soft-label">{pendingWhatsAppMessages} pendentes</span>
+          <span className="soft-label">{pendingClientDeliveryOrders.length} novo(s)</span>
         </div>
-        <div className="integration-callout">
-          <div>
-            <strong>Webhook do LoccoBurger</strong>
-            <span>{whatsappWebhookUrl}</span>
-          </div>
-          <small>Use esta URL na configuracao do WhatsApp Cloud API. As mensagens recebidas aparecem abaixo para conferencia.</small>
-        </div>
-        {actionableWhatsAppMessages.length === 0 ? (
-          <p className="empty-state">Nenhuma mensagem pendente do WhatsApp.</p>
+
+        {siteDeliveryMessage && (
+          <div className={siteDeliveryMessage.ok ? 'form-hint' : 'form-alert'}>{siteDeliveryMessage.message}</div>
+        )}
+
+        {pendingClientDeliveryOrders.length === 0 ? (
+          <p className="empty-state">Nenhum pedido do site aguardando aprovacao.</p>
         ) : (
-          <div className="whatsapp-inbox-grid">
-            {actionableWhatsAppMessages.map((message) => (
-              <div className="whatsapp-message-card" key={message.id}>
+          <div className="site-delivery-order-grid">
+            {pendingClientDeliveryOrders.map((order) => (
+              <article className="site-delivery-order-card" key={order.id}>
                 <div>
-                  <strong>{message.customerName || 'Cliente WhatsApp'}</strong>
-                  <span>{message.fromPhone}</span>
+                  <span>{order.id}</span>
+                  <strong>{order.customerName}</strong>
+                  <small>{order.phone}</small>
                 </div>
-                <p>{message.body}</p>
+                <p>{order.address}{order.complement ? ` - ${order.complement}` : ''}</p>
+                <div className="qr-order-items">
+                  {(order.items ?? []).map((item) => (
+                    <span key={item.id}>{item.quantity}x {item.name}</span>
+                  ))}
+                </div>
+                {order.notes && <small className="qr-order-note">{order.notes}</small>}
+                <div className="site-delivery-total-row">
+                  <span>{order.paymentMethod === 'link' ? 'Link Mercado Pago solicitado' : 'Pagar na entrega'}</span>
+                  <strong>{currency.format(order.total || 0)}</strong>
+                </div>
                 <div className="row-actions">
-                  <StatusBadge status={message.status} />
-                  <button className="secondary-button" type="button" onClick={() => handlePrepareWhatsAppOrder(message)}>
-                    Montar pedido
+                  <button
+                    className="primary-button"
+                    disabled={Boolean(siteDeliveryActionLoading)}
+                    type="button"
+                    onClick={() => handleApproveSiteDelivery(order.id)}
+                  >
+                    {siteDeliveryActionLoading === `${order.id}-normal` ? 'Enviando...' : 'Aprovar e enviar'}
                   </button>
-                  <button className="ghost-button" type="button" onClick={() => handleIgnoreWhatsAppMessage(message.id)}>
-                    Ignorar
+                  <button
+                    className="ghost-button"
+                    disabled={Boolean(siteDeliveryActionLoading)}
+                    type="button"
+                    onClick={() => handleApproveSiteDelivery(order.id, true)}
+                  >
+                    {siteDeliveryActionLoading === `${order.id}-force` ? 'Enviando...' : 'Aprovar sem estoque'}
+                  </button>
+                  <button className="ghost-button danger-button" disabled={Boolean(siteDeliveryActionLoading)} type="button" onClick={() => handleRejectSiteDelivery(order.id)}>
+                    Recusar
                   </button>
                 </div>
-              </div>
+                {pendingSiteDeliveryOverride === order.id && (
+                  <button className="secondary-button" type="button" onClick={() => handleApproveSiteDelivery(order.id, true)}>
+                    Continuar mesmo sem estoque
+                  </button>
+                )}
+              </article>
             ))}
           </div>
+        )}
+
+        {processedClientDeliveryOrders.length > 0 && (
+          <details className="qr-processed-list site-delivery-history">
+            <summary>
+              <strong>Historico do site</strong>
+              <span>{processedClientDeliveryOrders.length} recentes</span>
+            </summary>
+            <div className="row-actions">
+              <button className="ghost-button danger-button" disabled={deliveryClearLoading === 'site-history'} type="button" onClick={handleClearSiteHistory}>
+                {deliveryClearLoading === 'site-history' ? 'Limpando...' : 'Limpar historico do site'}
+              </button>
+            </div>
+            <div className="qr-processed-scroll">
+              {processedClientDeliveryOrders.map((order) => (
+                <span key={order.id}>{order.customerName}: {order.status} - {order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'sem data'}</span>
+              ))}
+            </div>
+          </details>
         )}
       </Card>
 
@@ -370,9 +592,43 @@ export function Delivery({
             <p className="eyebrow">Pedidos externos</p>
             <h2>Fila de delivery</h2>
           </div>
-          <span className="soft-label">{deliveries.length} pedidos</span>
+          <span className="soft-label">{visibleDeliveries.length} de {deliveries.length} pedidos</span>
         </div>
-        <div className="responsive-table">
+        <div className="delivery-queue-toolbar">
+          <label>
+            Buscar
+            <input
+              value={deliverySearch}
+              onChange={(event) => setDeliverySearch(event.target.value)}
+              placeholder="Nome, telefone, pedido, endereco ou item"
+            />
+          </label>
+          <label>
+            Dia
+            <select value={deliveryDateFilter} onChange={(event) => setDeliveryDateFilter(event.target.value)}>
+              <option value="todos">Todos os dias</option>
+              {deliveryDateOptions.map((dateKey) => (
+                <option key={dateKey} value={dateKey}>
+                  {dateKey === todayDateKey ? `Hoje - ${formatDeliveryDateLabel(dateKey)}` : formatDeliveryDateLabel(dateKey)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Status
+            <select value={deliveryStatusFilter} onChange={(event) => setDeliveryStatusFilter(event.target.value)}>
+              <option value="ativos">Ativos</option>
+              <option value="novo">Novo</option>
+              <option value="preparando">Preparando</option>
+              <option value="pronto">Pronto</option>
+              <option value="despachado">Em rota</option>
+              <option value="entregue">Entregue</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
+        </div>
+        {orderMessage && <div className={orderMessage.ok ? 'form-hint' : 'form-alert'}>{orderMessage.message}</div>}
+        <div className="responsive-table delivery-queue-table-wrap">
           <table>
             <thead>
               <tr>
@@ -387,25 +643,78 @@ export function Delivery({
               </tr>
             </thead>
             <tbody>
-              {deliveries.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.id}</td>
-                  <td>{order.customer}</td>
-                  <td>{order.channel}</td>
-                  <td><StatusBadge status={order.status} /></td>
-                  <td>{order.address}</td>
-                  <td>{(order.items ?? []).map((item) => `${item.quantity}x ${item.name}`).join(', ')}</td>
-                  <td>{currency.format(order.total)}</td>
-                  <td>
-                    <button className="ghost-button" type="button" onClick={() => onAdvanceOrder(order.id)}>
-                      Avancar
-                    </button>
-                  </td>
+              {groupedDeliveries.length === 0 ? (
+                <tr>
+                  <td colSpan="8">Nenhum pedido encontrado com os filtros atuais.</td>
                 </tr>
+              ) : groupedDeliveries.map((group) => (
+                <Fragment key={group.dateKey}>
+                  <tr className="delivery-date-row">
+                    <td colSpan="8">{formatDeliveryDateLabel(group.dateKey)} - {group.orders.length} pedido(s)</td>
+                  </tr>
+                  {group.orders.map((order) => (
+                    <tr key={order.id}>
+                      <td>{order.id}</td>
+                      <td>
+                        <strong>{order.customer}</strong>
+                        {order.phone && <span className="muted">{order.phone}</span>}
+                      </td>
+                      <td>{order.channel}</td>
+                      <td><StatusBadge status={order.status} /></td>
+                      <td>{order.address}</td>
+                      <td>{(order.items ?? []).map((item) => `${item.quantity}x ${item.name}`).join(', ')}</td>
+                      <td>{currency.format(order.total)}</td>
+                      <td>
+                        <div className="row-actions">
+                          <button className="ghost-button" type="button" onClick={() => setSelectedDeliveryOrderId(order.id)}>
+                            Ver
+                          </button>
+                          <button
+                            className="ghost-button"
+                            disabled={order.status === 'entregue' || deliveryActionLoading === order.id}
+                            type="button"
+                            onClick={() => handleAdvanceDeliveryQueueOrder(order.id)}
+                          >
+                            {deliveryActionLoading === order.id ? 'Atualizando...' : order.status === 'entregue' ? 'Finalizado' : 'Avancar'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
         </div>
+        {selectedDeliveryOrder && (
+          <div className="delivery-detail-panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Detalhes do pedido</p>
+                <h3>{selectedDeliveryOrder.id} - {selectedDeliveryOrder.customer}</h3>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setSelectedDeliveryOrderId(null)}>Fechar</button>
+            </div>
+            <div className="delivery-detail-grid">
+              <div><span>Status</span><strong><StatusBadge status={selectedDeliveryOrder.status} /></strong></div>
+              <div><span>Canal</span><strong>{selectedDeliveryOrder.channel}</strong></div>
+              <div><span>Endereco</span><strong>{selectedDeliveryOrder.address}</strong></div>
+              <div><span>Total</span><strong>{currency.format(selectedDeliveryOrder.total)}</strong></div>
+              <div><span>Telefone</span><strong>{selectedDeliveryOrder.phone ?? '-'}</strong></div>
+              <div><span>Pagamento</span><strong>{getDeliveryPaymentLabel(selectedDeliveryOrder)} / {selectedDeliveryOrder.paymentStatus ?? 'pendente'}</strong></div>
+              <div><span>Previsao</span><strong>{selectedDeliveryOrder.eta ?? '-'}</strong></div>
+            </div>
+            <div className="delivery-detail-items">
+              {(selectedDeliveryOrder.items ?? []).map((item) => (
+                <article key={`${selectedDeliveryOrder.id}-${item.productId}-${item.name}`}>
+                  <strong>{item.quantity}x {item.name}</strong>
+                  <span>{currency.format(item.total || 0)}</span>
+                  {(item.notes || item.manualNotes) && <small>{item.manualNotes || item.notes}</small>}
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -558,8 +867,8 @@ export function Delivery({
             <div className={orderMessage.ok ? 'form-hint' : 'form-alert'}>{orderMessage.message}</div>
           )}
           {pendingOverride && (
-            <button className="secondary-button" type="button" onClick={handleForceCreateOrder}>
-              Continuar mesmo assim
+            <button className="secondary-button" disabled={manualOrderLoading} type="button" onClick={handleForceCreateOrder}>
+              {manualOrderLoading ? 'Salvando...' : 'Continuar mesmo assim'}
             </button>
           )}
           <div className="delivery-order-draft">
@@ -595,7 +904,9 @@ export function Delivery({
             <button className="secondary-button" type="button" onClick={handleAddItemToOrder}>
               Adicionar item
             </button>
-            <button className="primary-button" type="submit">Finalizar pedido delivery</button>
+            <button className="primary-button" disabled={manualOrderLoading} type="submit">
+              {manualOrderLoading ? 'Salvando no sistema...' : 'Finalizar pedido delivery'}
+            </button>
           </div>
         </form>
       </Card>

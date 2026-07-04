@@ -11,6 +11,8 @@ export function Layout({
   deviceViewOptions,
   icons,
   navigation,
+  notifications,
+  onClearNotifications,
   onDeviceViewChange,
   onNavigate,
   onLogout,
@@ -49,7 +51,10 @@ export function Layout({
           deviceView={deviceView}
           deviceViewOptions={deviceViewOptions}
           icons={icons}
+          notifications={notifications}
+          onClearNotifications={onClearNotifications}
           onDeviceViewChange={onDeviceViewChange}
+          onNavigate={onNavigate}
           onMenuClick={() => {
             setSidebarCollapsed(false)
             setSidebarOpen(true)

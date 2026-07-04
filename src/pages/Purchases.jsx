@@ -7,6 +7,7 @@ import {
   getSuggestedPurchaseQuantity,
 } from '../lib/inventoryRepository.js'
 import { fetchFiscalCouponFromSefaz, normalizeFiscalText } from '../lib/fiscalCouponRepository.js'
+import { getTodayLocalDateKey } from '../lib/dateUtils.js'
 import { createPurchaseSuggestion } from '../lib/purchaseRepository.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -33,7 +34,7 @@ function getPurchaseSuggestionRows(items) {
 }
 
 function getExportFileName(extension) {
-  const date = new Date().toISOString().slice(0, 10)
+  const date = getTodayLocalDateKey()
   return `loccoburger-lista-compras-${date}.${extension}`
 }
 

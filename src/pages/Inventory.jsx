@@ -41,6 +41,8 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
   const [itemMessage, setItemMessage] = useState(null)
   const [maintenanceMessage, setMaintenanceMessage] = useState(null)
   const [maintenanceLoading, setMaintenanceLoading] = useState(false)
+  const [itemEditorOpen, setItemEditorOpen] = useState(false)
+  const [itemSaving, setItemSaving] = useState(false)
 
   const stockValue = inventoryItems.reduce((total, item) => total + item.currentStock * item.averageCost, 0)
   const lowItems = inventoryItems.filter((item) => getStockStatus(item) !== 'saudavel')
@@ -92,10 +94,19 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
       averageCost: item.averageCost,
       supplier: item.supplier,
     })
+    setItemMessage({ ok: true, text: `Editando ${item.name}. Ajuste estoque, minimo, custo ou fornecedor e clique em Salvar.` })
+    setItemEditorOpen(true)
   }
 
-  function handleSaveItem(event) {
+  function handleNewItem() {
+    setItemForm(emptyItemForm)
+    setItemMessage({ ok: true, text: 'Cadastre um novo insumo para usar no estoque e nas fichas tecnicas.' })
+    setItemEditorOpen(true)
+  }
+
+  async function handleSaveItem(event) {
     event.preventDefault()
+    if (itemSaving) return
     const currentStock = parseNumericInput(itemForm.currentStock)
     const minStock = parseNumericInput(itemForm.minStock)
     const averageCost = parseNumericInput(itemForm.averageCost)
@@ -110,14 +121,32 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
       return
     }
 
-    onSaveInventoryItem({
-      ...itemForm,
-      currentStock,
-      minStock,
-      averageCost,
-    })
-    setItemMessage({ ok: true, text: `${itemForm.name} salvo no estoque.` })
-    setItemForm(emptyItemForm)
+    setItemSaving(true)
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onSaveInventoryItem({
+          ...itemForm,
+          currentStock,
+          minStock,
+          averageCost,
+        })),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      const ok = result?.ok !== false
+      setItemMessage({
+        ok,
+        text: result?.message ?? `${itemForm.name} salvo no estoque.`,
+      })
+      if (ok) {
+        setItemForm(emptyItemForm)
+        setItemEditorOpen(false)
+      }
+    } catch (error) {
+      setItemMessage({ ok: false, text: error?.message ?? 'Nao foi possivel salvar este insumo.' })
+    } finally {
+      setItemSaving(false)
+    }
   }
 
   function handleAdjustmentSubmit(event) {
@@ -200,9 +229,13 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
           <div>
             <p className="eyebrow">Insumos</p>
             <h2>Controle de estoque</h2>
+            <small>Clique em <strong>Editar estoque</strong> na linha do insumo para alterar quantidade, minimo, custo ou fornecedor.</small>
           </div>
           <div className="row-actions">
             <span className="soft-label">Atualiza custo medio</span>
+            <button className="secondary-button" type="button" onClick={handleNewItem}>
+              Novo insumo
+            </button>
             {onResetInventory && (
               <button
                 className="ghost-button danger-button"
@@ -245,7 +278,7 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
                   <td><StatusBadge status={getStockStatus(item)} /></td>
                   <td>
                     <button className="ghost-button" type="button" onClick={() => handleEditItem(item)}>
-                      Editar
+                      Editar estoque
                     </button>
                   </td>
                 </tr>
@@ -255,12 +288,17 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
         </div>
       </Card>
 
-      <Card>
+      {itemEditorOpen && (
+      <div className="inventory-editor-overlay" role="dialog" aria-modal="true" aria-label="Editar estoque">
+      <Card className="inventory-editor-card modal-card">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Cadastro</p>
             <h2>{editingItem ? 'Editar insumo' : 'Novo insumo'}</h2>
           </div>
+          <button className="ghost-button" type="button" onClick={() => setItemEditorOpen(false)}>
+            Fechar
+          </button>
         </div>
 
         <form className="entry-form" onSubmit={handleSaveItem}>
@@ -325,9 +363,11 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
             />
           </label>
           <div className="form-actions">
-            <button className="primary-button" type="submit">Salvar insumo</button>
+            <button className="primary-button" disabled={itemSaving} type="submit">
+              {itemSaving ? 'Salvando no estoque...' : 'Salvar insumo'}
+            </button>
             {editingItem && (
-              <button className="ghost-button" type="button" onClick={() => setItemForm(emptyItemForm)}>
+              <button className="ghost-button" disabled={itemSaving} type="button" onClick={() => setItemForm(emptyItemForm)}>
                 Cancelar
               </button>
             )}
@@ -337,6 +377,8 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
           )}
         </form>
       </Card>
+      </div>
+      )}
 
       <Card>
         <div className="section-heading">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BrandLogo } from './BrandLogo.jsx'
 
 export function Header({
@@ -7,8 +7,11 @@ export function Header({
   deviceView,
   deviceViewOptions,
   pageTitle,
+  notifications = [],
+  onClearNotifications,
   onDeviceViewChange,
   onMenuClick,
+  onNavigate,
   onProfileChange,
   onResetData,
   onResetFinancialData,
@@ -28,6 +31,25 @@ export function Header({
   const [maintenanceOpen, setMaintenanceOpen] = useState(false)
   const [maintenanceLoading, setMaintenanceLoading] = useState(null)
   const [maintenanceMessage, setMaintenanceMessage] = useState(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [dismissedToastId, setDismissedToastId] = useState(null)
+  const visibleNotificationPages = accessProfiles[activeProfile]?.pages ?? []
+  const visibleNotifications = activeProfile === 'admin'
+    ? notifications
+    : notifications.filter((notification) => (
+        notification.targetPage ? visibleNotificationPages.includes(notification.targetPage) : notification.type === activeProfile
+      ))
+  const latestNotification = visibleNotifications[0]
+  const showNotificationToast = latestNotification && dismissedToastId !== latestNotification.id
+  const shouldShowRepositoryStatus = repositoryStatus &&
+    ['local', 'supabase-error'].includes(repositoryStatus.mode)
+
+  useEffect(() => {
+    if (!latestNotification) return undefined
+
+    const timeoutId = window.setTimeout(() => setDismissedToastId(latestNotification.id), 5200)
+    return () => window.clearTimeout(timeoutId)
+  }, [latestNotification])
 
   async function runMaintenance(actionId, handler, confirmText) {
     if (!handler) return
@@ -62,6 +84,46 @@ export function Header({
         <h1>{pageTitle}</h1>
       </div>
       <div className="header-actions">
+        <div className="admin-notifications">
+          <button
+            className={`notification-button ${visibleNotifications.length > 0 ? 'has-items' : ''}`}
+            type="button"
+            onClick={() => setNotificationsOpen((isOpen) => !isOpen)}
+          >
+            <span>Notificacoes</span>
+            {visibleNotifications.length > 0 && <b>{visibleNotifications.length}</b>}
+          </button>
+          {notificationsOpen && (
+            <div className="notification-menu">
+              <div className="notification-menu-head">
+                <strong>Central de notificacoes</strong>
+                <button type="button" onClick={onClearNotifications}>Limpar</button>
+              </div>
+              {visibleNotifications.length === 0 ? (
+                <p>Nenhuma notificacao agora.</p>
+              ) : visibleNotifications.slice(0, 20).map((notification) => (
+                <article className={`notification-row notification-${notification.type}`} key={notification.id}>
+                  <div>
+                    <strong>{notification.title}</strong>
+                    <span>{notification.message}</span>
+                    <small>{new Date(notification.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small>
+                  </div>
+                  {notification.targetPage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onNavigate?.(notification.targetPage)
+                        setNotificationsOpen(false)
+                      }}
+                    >
+                      Ver
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
         <label className="device-switcher">
           Visual
           <select value={deviceView ?? 'auto'} onChange={(event) => onDeviceViewChange?.(event.target.value)}>
@@ -83,7 +145,9 @@ export function Header({
           <span className="role-pill">{profileLabel}</span>
         )}
         {userProfile?.store_name && <span className="role-pill">{userProfile.store_name}</span>}
-        <span className={`storage-pill storage-${repositoryStatus.mode}`}>{repositoryStatus.label}</span>
+        {shouldShowRepositoryStatus && (
+          <span className={`storage-pill storage-${repositoryStatus.mode}`}>{repositoryStatus.label}</span>
+        )}
         {syncStatus && <span className={`sync-pill sync-${syncStatus.mode}`}>{syncStatus.label}</span>}
         {userEmail && <span className="user-email-pill">{userEmail}</span>}
         {canRunMaintenance && (
@@ -170,6 +234,15 @@ export function Header({
         <span className="shift-pill">Turno Noite</span>
         <BrandLogo compact />
       </div>
+      {showNotificationToast && (
+        <div className={`admin-notification-toast notification-${latestNotification.type}`} role="status" aria-live="polite">
+          <div>
+            <strong>{latestNotification.title}</strong>
+            <span>{latestNotification.message}</span>
+          </div>
+          <button type="button" onClick={() => setDismissedToastId(latestNotification.id)}>×</button>
+        </div>
+      )}
     </header>
   )
 }

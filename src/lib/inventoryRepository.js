@@ -1,3 +1,5 @@
+import { getLocalDateKey } from './dateUtils.js'
+
 export function getStockStatus(item) {
   if (item.currentStock <= item.minStock * 0.6) return 'critico'
   if (item.currentStock <= item.minStock) return 'baixo'
@@ -71,7 +73,7 @@ export function createStockAdjustment({ adjustment, currentAdjustments, inventor
     reason: adjustment.reason.trim() || 'Perda operacional',
     type: 'perda',
     createdAt: now.toLocaleDateString('pt-BR'),
-    createdAtIso: now.toISOString().slice(0, 10),
+    createdAtIso: getLocalDateKey(now),
     time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   }
 }

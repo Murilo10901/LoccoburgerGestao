@@ -16,12 +16,14 @@ const emptyProductForm = {
   name: '',
   category: 'Burger',
   type: 'Produto acabado',
+  description: '',
   price: '',
   recipeId: '',
 }
 
-export function Products({ inventoryItems, onCreateSheet, onSaveProduct, onToggleProduct, products, technicalSheets }) {
+export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSaveProduct, onToggleProduct, products, technicalSheets }) {
   const [productForm, setProductForm] = useState(emptyProductForm)
+  const [productSaving, setProductSaving] = useState(false)
   const productsWithSheet = products.filter((product) => product.recipeId)
   const [simulatorProductId, setSimulatorProductId] = useState(productsWithSheet[0]?.id ?? '')
   const [simulatedCosts, setSimulatedCosts] = useState({})
@@ -43,21 +45,34 @@ export function Products({ inventoryItems, onCreateSheet, onSaveProduct, onToggl
       name: product.name,
       category: product.category,
       type: product.type,
+      description: product.description ?? '',
       price: product.price,
       recipeId: product.recipeId ?? '',
     })
   }
 
-  function handleSubmit(event) {
+  async function handleDeleteProduct(product) {
+    if (!onDeleteProduct || productSaving) return
+    if (!window.confirm(`Tem certeza que deseja excluir "${product.name}" do cardapio? Use inativar quando quiser apenas esconder do delivery/QR.`)) return
+
+    setProductSaving(true)
+    const result = await onDeleteProduct(product.id)
+    if (result?.ok !== false && Number(productForm.id) === Number(product.id)) setProductForm(emptyProductForm)
+    setProductSaving(false)
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!productForm.sku.trim() || !productForm.name.trim() || Number(productForm.price) < 0) return
+    if (productSaving || !productForm.sku.trim() || !productForm.name.trim() || Number(productForm.price) < 0) return
 
-    onSaveProduct({
+    setProductSaving(true)
+    const result = await onSaveProduct({
       ...productForm,
       active: editingProduct?.active ?? true,
     })
-    setProductForm(emptyProductForm)
+    if (result?.ok !== false) setProductForm(emptyProductForm)
+    setProductSaving(false)
   }
 
   function updateSimulatedCost(inventoryItemId, value) {
@@ -220,6 +235,7 @@ export function Products({ inventoryItems, onCreateSheet, onSaveProduct, onToggl
                 <div>
                   <strong>{product.name}</strong>
                   <span>{product.sku} - {product.category} - {product.type}</span>
+                  {product.description && <small>{product.description}</small>}
                 </div>
                 <div className="metric-cell">
                   <span>Venda</span>
@@ -243,9 +259,14 @@ export function Products({ inventoryItems, onCreateSheet, onSaveProduct, onToggl
                   <button className="ghost-button" type="button" onClick={() => handleEditProduct(product)}>
                     Editar
                   </button>
-                  <button className="ghost-button" type="button" onClick={() => onToggleProduct(product.id)}>
+                  <button className="ghost-button" disabled={productSaving} type="button" onClick={() => onToggleProduct(product.id)}>
                     {product.active ? 'Inativar' : 'Ativar'}
                   </button>
+                  {onDeleteProduct && (
+                    <button className="ghost-button danger-button" disabled={productSaving} type="button" onClick={() => handleDeleteProduct(product)}>
+                      Excluir
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -290,6 +311,15 @@ export function Products({ inventoryItems, onCreateSheet, onSaveProduct, onToggl
               placeholder="Nome do produto"
             />
           </label>
+          <label>
+            Descricao no cardapio
+            <textarea
+              rows="3"
+              value={productForm.description}
+              onChange={(event) => setProductForm((form) => ({ ...form, description: event.target.value }))}
+              placeholder="Ex.: Pao brioche, blend artesanal, queijo, bacon e maionese da casa."
+            />
+          </label>
           <div className="form-grid">
             <label>
               Categoria
@@ -330,7 +360,9 @@ export function Products({ inventoryItems, onCreateSheet, onSaveProduct, onToggl
             </select>
           </label>
           <div className="form-actions">
-            <button className="primary-button" type="submit">Salvar produto</button>
+            <button className="primary-button" disabled={productSaving} type="submit">
+              {productSaving ? 'Salvando...' : 'Salvar produto'}
+            </button>
             {editingProduct && (
               <button className="ghost-button" type="button" onClick={() => setProductForm(emptyProductForm)}>
                 Cancelar

@@ -41,7 +41,26 @@ export function Customers({
   })
   const [customerMessage, setCustomerMessage] = useState(null)
   const [campaignMessage, setCampaignMessage] = useState(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customerViewFilter, setCustomerViewFilter] = useState('crm')
+  const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef(null)
+
+  const normalizedCustomerSearch = customerSearch
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  const visibleCustomers = rankedCustomers.filter((customer) => {
+    const tags = customer.tags ?? []
+    const isGuest = tags.includes('Convidado') || String(customer.notes ?? '').toLowerCase().includes('pedido convidado')
+    const matchesType = customerViewFilter === 'todos' ||
+      (customerViewFilter === 'crm' ? !isGuest : isGuest)
+    const haystack = `${customer.name} ${customer.phone} ${customer.address} ${(customer.tags ?? []).join(' ')}`
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+    return matchesType && (!normalizedCustomerSearch || haystack.includes(normalizedCustomerSearch))
+  })
 
   const selectedCustomer =
     rankedCustomers.find((customer) => customer.id === Number(selectedCustomerId)) ?? rankedCustomers[0]
@@ -67,6 +86,7 @@ export function Customers({
 
   function viewCustomer(customer) {
     setSelectedCustomerId(customer.id)
+    setProfileOpen(true)
     setCustomerMessage({ ok: true, text: `Mostrando perfil de ${customer.name}.` })
 
     window.setTimeout(() => {
@@ -127,9 +147,27 @@ export function Customers({
         <div className="section-heading">
           <div>
             <p className="eyebrow">Relacionamento</p>
-            <h2>Melhores clientes</h2>
+            <h2>Clientes cadastrados</h2>
           </div>
-          <span className="soft-label">Cashback {cashbackRate}%</span>
+          <span className="soft-label">{visibleCustomers.length} de {rankedCustomers.length}</span>
+        </div>
+        <div className="customer-list-toolbar">
+          <label>
+            Buscar cliente
+            <input
+              value={customerSearch}
+              onChange={(event) => setCustomerSearch(event.target.value)}
+              placeholder="Nome, telefone, endereco ou tag"
+            />
+          </label>
+          <label>
+            Lista
+            <select value={customerViewFilter} onChange={(event) => setCustomerViewFilter(event.target.value)}>
+              <option value="crm">Clientes reais/CRM</option>
+              <option value="convidados">Convidados</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
         </div>
         <div className="responsive-table">
           <table>
@@ -145,7 +183,11 @@ export function Customers({
               </tr>
             </thead>
             <tbody>
-              {rankedCustomers.map((customer) => (
+              {visibleCustomers.length === 0 ? (
+                <tr>
+                  <td colSpan="7">Nenhum cliente encontrado com os filtros atuais.</td>
+                </tr>
+              ) : visibleCustomers.map((customer) => (
                 <tr key={customer.id}>
                   <td>
                     <strong>{customer.name}</strong>
@@ -237,7 +279,7 @@ export function Customers({
               value={campaignForm.customerId}
               onChange={(event) => setCampaignForm((form) => ({ ...form, customerId: Number(event.target.value) }))}
             >
-              {rankedCustomers.map((customer) => (
+              {visibleCustomers.filter((customer) => !(customer.tags ?? []).includes('Convidado')).map((customer) => (
                 <option key={customer.id} value={customer.id}>{customer.name}</option>
               ))}
             </select>
@@ -291,9 +333,14 @@ export function Customers({
             <p className="eyebrow">Perfil</p>
             <h2>{selectedCustomer?.name ?? 'Cliente'}</h2>
           </div>
-          {bestCustomer?.id === selectedCustomer?.id && <StatusBadge status="vip" />}
+          <div className="row-actions">
+            {bestCustomer?.id === selectedCustomer?.id && <StatusBadge status="vip" />}
+            <button className="ghost-button" type="button" onClick={() => setProfileOpen((isOpen) => !isOpen)}>
+              {profileOpen ? 'Recolher' : 'Abrir perfil'}
+            </button>
+          </div>
         </div>
-        {selectedCustomer && (
+        {selectedCustomer && profileOpen && (
           <div className="customer-profile">
             <p>{selectedCustomer.phone}</p>
             <p>{selectedCustomer.address}</p>

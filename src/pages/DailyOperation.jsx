@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
+import { getTodayLocalDateKey } from '../lib/dateUtils.js'
 import { getOperationPeriodSummary } from '../lib/operationRepository.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -14,7 +15,7 @@ const periodOptions = [
   { id: 'mes', label: 'Mes' },
 ]
 
-const defaultSelectedDate = new Date().toISOString().slice(0, 10)
+const defaultSelectedDate = getTodayLocalDateKey()
 
 function percent(value, base) {
   if (!base) return '0.0%'

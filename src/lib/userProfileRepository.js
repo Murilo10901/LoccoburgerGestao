@@ -107,3 +107,54 @@ export async function attachUserToStore(email, role) {
 
   return { ok: true, profile: data?.[0] ?? null, message: 'Usuario vinculado a loja com sucesso.' }
 }
+
+export async function createManagedUser({ email, password, fullName, role }) {
+  const normalizedEmail = String(email ?? '').trim().toLowerCase()
+  if (!normalizedEmail || !password || String(password).length < 6) {
+    return { ok: false, message: 'Informe e-mail e senha com no minimo 6 caracteres.' }
+  }
+
+  const { data, error } = await supabase.functions.invoke('admin-create-user', {
+    body: {
+      email: normalizedEmail,
+      password,
+      full_name: String(fullName ?? '').trim(),
+      role,
+    },
+  })
+
+  if (error) {
+    return {
+      ok: false,
+      message: `Falha ao criar usuario. Configure a Edge Function admin-create-user no Supabase. Detalhe: ${error.message}`,
+    }
+  }
+
+  return {
+    ok: true,
+    profile: data?.profile ?? null,
+    message: data?.message ?? 'Usuario criado e vinculado a loja com sucesso.',
+  }
+}
+
+export async function deleteManagedUser(userId) {
+  if (!userId) return { ok: false, message: 'Usuario invalido para excluir.' }
+
+  const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+    body: {
+      user_id: userId,
+    },
+  })
+
+  if (error) {
+    return {
+      ok: false,
+      message: `Falha ao excluir usuario. Configure a Edge Function admin-delete-user no Supabase. Detalhe: ${error.message}`,
+    }
+  }
+
+  return {
+    ok: true,
+    message: data?.message ?? 'Usuario excluido com sucesso.',
+  }
+}

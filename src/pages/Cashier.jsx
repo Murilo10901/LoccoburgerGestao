@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
+import { formatLocalDateLabel, getLocalDateKey, getTodayLocalDateKey } from '../lib/dateUtils.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -41,6 +42,51 @@ function parseMoney(value) {
   return Number.isFinite(parsedValue) ? parsedValue : 0
 }
 
+function getPaymentDateKey(payment) {
+  const rawValue = payment?.paidAtIso || payment?.createdAtIso || payment?.paidAt
+  const dateKey = getLocalDateKey(rawValue)
+  return dateKey || 'sem-data'
+}
+
+function formatDateFilterLabel(dateKey) {
+  if (dateKey === 'sem-data') return 'Sem data'
+  return formatLocalDateLabel(dateKey)
+}
+
+function getPaymentTimestamp(payment) {
+  const rawValue = payment?.paidAtIso || payment?.createdAtIso || payment?.paidAt
+  const parsed = rawValue ? new Date(rawValue).getTime() : 0
+  if (Number.isFinite(parsed) && parsed > 0) return parsed
+
+  const idTime = Number(String(payment?.id ?? '').split('-')[0])
+  return Number.isFinite(idTime) ? idTime : 0
+}
+
+function normalizeSearch(value) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+function getPaymentOriginLabel(payment) {
+  if (payment.source === 'caderneta') return `Caderneta ${payment.customerName ?? payment.receivableId}`
+  if (payment.source === 'delivery') return `Delivery ${payment.deliveryId}`
+  if (payment.source === 'venda-rapida') return `Venda rapida ${payment.customerName ?? 'Balcao'}`
+  return `Mesa ${String(payment.tableId).padStart(2, '0')}${payment.tabName ? ` - ${payment.tabName}` : ''}`
+}
+
+function getPaymentSourceLabel(source) {
+  const labels = {
+    'venda-rapida': 'Venda rápida',
+    delivery: 'Delivery',
+    caderneta: 'Caderneta',
+    mesa: 'Mesa',
+  }
+
+  return labels[source] ?? 'Mesa'
+}
+
 export function Cashier({
   cashClosings = [],
   customers,
@@ -51,8 +97,14 @@ export function Cashier({
   payments,
   tables,
 }) {
-  const payableTables = tables.filter((table) => table.total > 0)
-  const payableDeliveries = deliveries.filter((order) => order.paymentStatus !== 'pago' && order.status !== 'entregue')
+  const payableTables = tables.filter((table) => Number(table.total || 0) > 0)
+  const closingTablesCount = tables.filter((table) => table.status === 'fechamento' && Number(table.total || 0) > 0).length
+  const payableDeliveries = deliveries.filter((order) => {
+    const alreadyPaid = order.paymentStatus === 'pago' ||
+      payments.some((payment) => payment.source === 'delivery' && payment.deliveryId === order.id)
+
+    return !alreadyPaid && !['recusado', 'cancelado'].includes(order.status)
+  })
   const totalPayableAccounts = payableTables.length + payableDeliveries.length
   const [accountType, setAccountType] = useState(payableTables.length > 0 ? 'mesa' : 'delivery')
   const [selectedTableId, setSelectedTableId] = useState(payableTables[0]?.id ?? '')
@@ -65,9 +117,17 @@ export function Cashier({
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '')
   const [splitPayments, setSplitPayments] = useState([])
   const [paymentMessage, setPaymentMessage] = useState(null)
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
+  const paymentProcessingRef = useRef(false)
   const [countedAmounts, setCountedAmounts] = useState({})
   const [closingNotes, setClosingNotes] = useState('')
   const [closingMessage, setClosingMessage] = useState(null)
+  const [closingProcessing, setClosingProcessing] = useState(false)
+  const [paymentSearch, setPaymentSearch] = useState('')
+  const [paymentDateFilter, setPaymentDateFilter] = useState('todos')
+  const [paymentSourceFilter, setPaymentSourceFilter] = useState('todos')
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('todos')
+  const [selectedPaymentId, setSelectedPaymentId] = useState(null)
 
   const selectedTable = useMemo(
     () => (accountType === 'mesa' ? payableTables.find((table) => table.id === Number(selectedTableId)) ?? payableTables[0] : null),
@@ -113,6 +173,32 @@ export function Cashier({
   const expectedCashTotal = closeablePaymentsByMethod.reduce((total, method) => total + method.expected, 0)
   const countedCashTotal = closeablePaymentsByMethod.reduce((total, method) => total + method.counted, 0)
   const closingDifference = countedCashTotal - expectedCashTotal
+  const todayDateKey = getTodayLocalDateKey()
+  const paymentDateOptions = Array.from(new Set([todayDateKey, ...payments.map(getPaymentDateKey)])).filter(Boolean)
+  const normalizedPaymentSearch = normalizeSearch(paymentSearch)
+  const filteredPayments = payments
+    .filter((payment) => {
+      const matchesDate = paymentDateFilter === 'todos' || getPaymentDateKey(payment) === paymentDateFilter
+      const matchesSource = paymentSourceFilter === 'todos' || (payment.source ?? 'mesa') === paymentSourceFilter
+      const matchesMethod = paymentMethodFilter === 'todos' || payment.method === paymentMethodFilter
+      const searchTarget = normalizeSearch([
+        payment.id,
+        payment.deliveryId,
+        payment.tableId,
+        payment.customerName,
+        payment.customerPhone,
+        payment.customerAddress,
+        getPaymentOriginLabel(payment),
+        ...(payment.items ?? []).map((item) => `${item.quantity}x ${item.name} ${item.notes ?? ''}`),
+      ].filter(Boolean).join(' '))
+      const matchesSearch = !normalizedPaymentSearch || searchTarget.includes(normalizedPaymentSearch)
+
+      return matchesDate && matchesSource && matchesMethod && matchesSearch
+    })
+    .sort((first, second) => getPaymentTimestamp(second) - getPaymentTimestamp(first))
+  const filteredPaymentsTotal = filteredPayments.reduce((total, payment) => total + Number(payment.amount || 0), 0)
+  const selectedPayment = filteredPayments.find((payment) => payment.id === selectedPaymentId) ??
+    payments.find((payment) => payment.id === selectedPaymentId)
 
   useEffect(() => {
     if (selectedDelivery?.customerId) {
@@ -144,9 +230,12 @@ export function Cashier({
     }
   }, [accountType, payableDeliveries, payableTables, selectedDelivery, selectedTable])
 
-  function handlePayment(event) {
+  async function handlePayment(event) {
     event.preventDefault()
+    if (paymentProcessingRef.current) return
     if ((!selectedTable && !selectedDelivery) || netAmount <= 0) return
+    paymentProcessingRef.current = true
+    setPaymentProcessing(true)
     const hasSplit = splitPayments.length > 0
     const paidAccountLabel = selectedDelivery
       ? `delivery ${selectedDelivery.id}`
@@ -156,6 +245,8 @@ export function Cashier({
 
     if (hasSplit && Math.abs(splitDifference) > 0.01) {
       setPaymentMessage({ ok: false, text: `A soma dos pagamentos precisa fechar ${currency.format(netAmount)}. Falta ${currency.format(splitDifference)}.` })
+      paymentProcessingRef.current = false
+      setPaymentProcessing(false)
       return
     }
 
@@ -175,34 +266,41 @@ export function Cashier({
 
     let closeResult = { ok: true, message: `Pagamento registrado para ${paidAccountLabel}. Caixa, faturamento e DRE foram atualizados.` }
 
-    if (selectedDelivery) {
-      closeResult = onCloseDeliveryPayment(selectedDelivery.id, paymentMethod, paymentOptions) ?? closeResult
-      if (closeResult.ok === false) {
-        setPaymentMessage({ ok: false, text: closeResult.message ?? 'Nao foi possivel registrar o pagamento.' })
-        return
-      }
+    try {
+      if (selectedDelivery) {
+        closeResult = await Promise.resolve(onCloseDeliveryPayment(selectedDelivery.id, paymentMethod, paymentOptions) ?? closeResult)
+        if (closeResult.ok === false) {
+          setPaymentMessage({ ok: false, text: closeResult.message ?? 'Nao foi possivel registrar o pagamento.' })
+          return
+        }
 
-      const nextDelivery = payableDeliveries.find((order) => order.id !== selectedDelivery.id)
-      setSelectedDeliveryId(nextDelivery?.id ?? '')
-      if (!nextDelivery && payableTables.length > 0) setAccountType('mesa')
-    } else {
-      closeResult = onCloseTablePayment(selectedTable.id, paymentMethod, paymentScope, paymentOptions) ?? closeResult
-      if (closeResult.ok === false) {
-        setPaymentMessage({ ok: false, text: closeResult.message ?? 'Nao foi possivel registrar o pagamento.' })
-        return
-      }
+        const nextDelivery = payableDeliveries.find((order) => order.id !== selectedDelivery.id)
+        setSelectedDeliveryId(nextDelivery?.id ?? '')
+        if (!nextDelivery && payableTables.length > 0) setAccountType('mesa')
+      } else {
+        closeResult = await Promise.resolve(onCloseTablePayment(selectedTable.id, paymentMethod, paymentScope, paymentOptions) ?? closeResult)
+        if (closeResult.ok === false) {
+          setPaymentMessage({ ok: false, text: closeResult.message ?? 'Nao foi possivel registrar o pagamento.' })
+          return
+        }
 
-      const nextTable = payableTables.find((table) => table.id !== selectedTable.id)
-      const hasRemainingBalance = paymentScope !== 'all' && selectedTable.total - selectedAmount > 0
-      setSelectedTableId(hasRemainingBalance ? selectedTable.id : nextTable?.id ?? '')
-      if (!hasRemainingBalance && !nextTable && payableDeliveries.length > 0) setAccountType('delivery')
+        const nextTable = payableTables.find((table) => table.id !== selectedTable.id)
+        const hasRemainingBalance = paymentScope !== 'all' && selectedTable.total - selectedAmount > 0
+        setSelectedTableId(hasRemainingBalance ? selectedTable.id : nextTable?.id ?? '')
+        if (!hasRemainingBalance && !nextTable && payableDeliveries.length > 0) setAccountType('delivery')
+      }
+      setPaymentScope('all')
+      setDiscount('')
+      setServiceCharge('')
+      setReceivedAmount('')
+      setSplitPayments([])
+      setPaymentMessage({ ok: true, text: closeResult.message ?? `Pagamento registrado para ${paidAccountLabel}. Caixa, faturamento e DRE foram atualizados.` })
+    } catch (error) {
+      setPaymentMessage({ ok: false, text: error?.message ?? 'Nao foi possivel registrar o pagamento agora. Tente novamente.' })
+    } finally {
+      paymentProcessingRef.current = false
+      setPaymentProcessing(false)
     }
-    setPaymentScope('all')
-    setDiscount('')
-    setServiceCharge('')
-    setReceivedAmount('')
-    setSplitPayments([])
-    setPaymentMessage({ ok: true, text: closeResult.message ?? `Pagamento registrado para ${paidAccountLabel}. Caixa, faturamento e DRE foram atualizados.` })
   }
 
   function setExactCash() {
@@ -240,39 +338,58 @@ export function Cashier({
     )
   }
 
-  function handleCloseShift(event) {
+  async function handleCloseShift(event) {
     event.preventDefault()
     if (expectedCashTotal <= 0) {
       setClosingMessage({ ok: false, text: 'Ainda nao existem recebimentos para fechar o caixa.' })
       return
     }
 
-    const result = onCloseCashierShift({
-      expectedTotal: expectedCashTotal,
-      countedTotal: countedCashTotal,
-      difference: closingDifference,
-      notes: closingNotes.trim(),
-      paymentsCount: payments.filter((payment) => Number(payment.amount || 0) > 0).length,
-      methods: closeablePaymentsByMethod.map((method) => ({
-        id: method.id,
-        label: method.label,
-        expected: method.expected,
-        counted: method.counted,
-        difference: method.counted - method.expected,
-      })),
-    })
+    setClosingProcessing(true)
+    setClosingMessage({ ok: true, text: 'Registrando fechamento no banco...' })
+
+    const result = await Promise.resolve(onCloseCashierShift({
+        expectedTotal: expectedCashTotal,
+        countedTotal: countedCashTotal,
+        difference: closingDifference,
+        notes: closingNotes.trim(),
+        paymentsCount: payments.filter((payment) => Number(payment.amount || 0) > 0).length,
+        methods: closeablePaymentsByMethod.map((method) => ({
+          id: method.id,
+          label: method.label,
+          expected: method.expected,
+          counted: method.counted,
+          difference: method.counted - method.expected,
+        })),
+      }))
+      .catch((error) => ({ ok: false, message: error?.message ?? 'Nao foi possivel registrar o fechamento.' }))
+      .finally(() => setClosingProcessing(false))
 
     if (result?.ok === false) {
       setClosingMessage({ ok: false, text: result.message })
       return
     }
 
-    setClosingMessage({ ok: true, text: 'Fechamento registrado no historico do caixa.' })
+    setClosingMessage({ ok: true, text: result?.message ?? 'Fechamento registrado no historico do caixa.' })
     setClosingNotes('')
   }
 
   return (
     <div className="cashier-grid">
+      {(paymentProcessing || closingProcessing) && (
+        <div className="cashier-action-overlay" role="status" aria-live="polite">
+          <div>
+            <span className="kitchen-feedback-spinner" aria-hidden="true" />
+            <p className="eyebrow">Banco de dados</p>
+            <h3>
+              {paymentProcessing
+                ? 'Registrando pagamento...'
+                : 'Fechando caixa...'}
+            </h3>
+            <small>Atualizando caixa, financeiro e DRE. Aguarde confirmar.</small>
+          </div>
+        </div>
+      )}
       <section className="stats-grid compact-stats">
         <Card className="stat-card">
           <span>Contas abertas</span>
@@ -280,7 +397,7 @@ export function Cashier({
         </Card>
         <Card className="stat-card">
           <span>Em fechamento</span>
-          <strong>{tables.filter((table) => table.status === 'fechamento').length}</strong>
+          <strong>{closingTablesCount}</strong>
         </Card>
         <Card className="stat-card">
           <span>Total pendente</span>
@@ -571,8 +688,14 @@ export function Cashier({
                 <div><span>A receber</span><strong>{currency.format(netAmount)}</strong></div>
               </div>
 
-              <button className="primary-button" type="submit">
-                {selectedDelivery ? 'Receber pedido delivery' : paymentScope === 'all' ? 'Receber e liberar mesa' : 'Receber comanda'}
+              <button className="primary-button" disabled={paymentProcessing} type="submit">
+                {paymentProcessing
+                  ? 'Processando pagamento...'
+                  : selectedDelivery
+                    ? 'Receber pedido delivery'
+                    : paymentScope === 'all'
+                      ? 'Receber e liberar mesa'
+                      : 'Receber comanda'}
               </button>
               {paymentMessage && (
                 <div className={paymentMessage.ok ? 'form-hint' : 'form-alert'}>{paymentMessage.text}</div>
@@ -590,11 +713,51 @@ export function Cashier({
             <p className="eyebrow">Turno</p>
             <h2>Pagamentos registrados</h2>
           </div>
+          <span className="soft-label">{filteredPayments.length} registro(s) - {currency.format(filteredPaymentsTotal)}</span>
+        </div>
+        <div className="payment-history-filters">
+          <label>
+            Buscar
+            <input
+              value={paymentSearch}
+              onChange={(event) => setPaymentSearch(event.target.value)}
+              placeholder="Cliente, telefone, pedido, mesa, endereco ou item"
+            />
+          </label>
+          <label>
+            Dia
+            <select value={paymentDateFilter} onChange={(event) => setPaymentDateFilter(event.target.value)}>
+              <option value="todos">Todos os dias</option>
+              {paymentDateOptions.map((dateKey) => (
+                <option key={dateKey} value={dateKey}>{dateKey === todayDateKey ? `Hoje - ${formatDateFilterLabel(dateKey)}` : formatDateFilterLabel(dateKey)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Origem
+            <select value={paymentSourceFilter} onChange={(event) => setPaymentSourceFilter(event.target.value)}>
+              <option value="todos">Todas</option>
+              <option value="mesa">Mesa</option>
+              <option value="delivery">Delivery</option>
+              <option value="venda-rapida">Venda rápida</option>
+              <option value="caderneta">Caderneta</option>
+            </select>
+          </label>
+          <label>
+            Forma
+            <select value={paymentMethodFilter} onChange={(event) => setPaymentMethodFilter(event.target.value)}>
+              <option value="todos">Todas</option>
+              {paymentMethods.map((method) => (
+                <option key={method.id} value={method.id}>{method.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="responsive-table">
           <table>
             <thead>
               <tr>
+                <th>Dia</th>
                 <th>Hora</th>
                 <th>Origem</th>
                 <th>Forma</th>
@@ -602,29 +765,64 @@ export function Cashier({
                 <th>Desconto</th>
                 <th>Troco</th>
                 <th>Valor</th>
+                <th>Acao</th>
               </tr>
             </thead>
             <tbody>
-              {payments.map((payment) => (
+              {filteredPayments.length === 0 ? (
+                <tr>
+                  <td colSpan="9">Nenhum pagamento encontrado com os filtros atuais.</td>
+                </tr>
+              ) : filteredPayments.map((payment) => (
                 <tr key={payment.id}>
+                  <td>{formatDateFilterLabel(getPaymentDateKey(payment))}</td>
                   <td>{payment.time}</td>
-                  <td>
-                    {payment.source === 'caderneta'
-                      ? `Caderneta ${payment.customerName ?? payment.receivableId}`
-                      : payment.source === 'delivery'
-                      ? `Delivery ${payment.deliveryId}`
-                      : `Mesa ${String(payment.tableId).padStart(2, '0')}${payment.tabName ? ` - ${payment.tabName}` : ''}`}
-                  </td>
+                  <td>{getPaymentOriginLabel(payment)}</td>
                   <td><StatusBadge status={payment.method} /></td>
                   <td>{currency.format(payment.grossAmount ?? payment.amount)}</td>
                   <td>{currency.format(payment.discount ?? 0)}</td>
                   <td>{currency.format(payment.change ?? 0)}</td>
                   <td>{currency.format(payment.amount)}</td>
+                  <td>
+                    <button className="ghost-button" type="button" onClick={() => setSelectedPaymentId(payment.id)}>
+                      Ver
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {selectedPayment && (
+          <div className="cashier-payment-detail-panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Detalhes do pagamento</p>
+                <h3>{getPaymentOriginLabel(selectedPayment)}</h3>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setSelectedPaymentId(null)}>Fechar</button>
+            </div>
+            <div className="delivery-detail-grid">
+              <div><span>Data</span><strong>{formatDateFilterLabel(getPaymentDateKey(selectedPayment))} {selectedPayment.time ?? ''}</strong></div>
+              <div><span>Cliente</span><strong>{selectedPayment.customerName ?? 'Nao informado'}</strong></div>
+              <div><span>Telefone</span><strong>{selectedPayment.customerPhone ?? '-'}</strong></div>
+              <div><span>Endereco</span><strong>{selectedPayment.customerAddress ?? '-'}</strong></div>
+              <div><span>Forma</span><strong>{selectedPayment.method}</strong></div>
+              <div><span>Total</span><strong>{currency.format(selectedPayment.amount ?? 0)}</strong></div>
+            </div>
+            <div className="delivery-detail-items">
+              {(selectedPayment.items ?? []).length === 0 ? (
+                <p className="empty-state">Sem itens detalhados neste registro.</p>
+              ) : selectedPayment.items.map((item, index) => (
+                <article key={`${selectedPayment.id}-${item.productId ?? item.name}-${index}`}>
+                  <strong>{item.quantity}x {item.name}</strong>
+                  <span>{currency.format(item.total || 0)}</span>
+                  {(item.notes || item.manualNotes) && <small>{item.manualNotes || item.notes}</small>}
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card>
@@ -686,7 +884,9 @@ export function Cashier({
               placeholder="Ex: diferenca conferida com o responsavel do turno"
             />
           </label>
-          <button className="primary-button" type="submit">Registrar fechamento</button>
+          <button className="primary-button" disabled={closingProcessing} type="submit">
+            {closingProcessing ? 'Registrando fechamento...' : 'Registrar fechamento'}
+          </button>
           {closingMessage && (
             <div className={closingMessage.ok ? 'form-hint' : 'form-alert'}>{closingMessage.text}</div>
           )}

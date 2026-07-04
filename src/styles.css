@@ -892,7 +892,7 @@ button {
 
 .open-table-form {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   align-items: end;
   gap: 10px;
 }
@@ -1236,7 +1236,7 @@ button {
 
 .guest-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.55fr) auto;
   gap: 8px;
 }
 
@@ -1248,6 +1248,44 @@ button {
   padding: 9px 11px;
   color: #2d160f;
   background: #fffaf5;
+}
+
+.table-history-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 0.35fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.table-history-toolbar label {
+  display: grid;
+  gap: 7px;
+  color: #6f4934;
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.table-history-toolbar input,
+.table-history-toolbar select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #edcfb5;
+  border-radius: 12px;
+  padding: 9px 11px;
+  color: #2d160f;
+  background: #fffaf5;
+  font: inherit;
+  font-weight: 800;
+}
+
+.table-history-table td {
+  vertical-align: top;
+}
+
+.table-history-table .muted {
+  display: block;
+  margin-top: 3px;
 }
 
 .order-items {
@@ -2889,6 +2927,10 @@ td small {
     grid-template-columns: 1fr;
   }
 
+  .table-history-toolbar {
+    grid-template-columns: 1fr;
+  }
+
   .cashier-table-row {
     grid-template-columns: 1fr;
   }
@@ -3072,6 +3114,7 @@ td small {
 .app-device-phone .kitchen-grid,
 .app-device-phone .open-table-form,
 .app-device-phone .guest-form,
+.app-device-phone .table-history-toolbar,
 .app-device-phone .quick-order-footer,
 .app-device-phone .pdv-method-grid,
 .app-device-phone .pdv-cash-box,
@@ -3396,6 +3439,96 @@ td small {
   line-height: 1.25;
 }
 
+.waiter-workspace .quick-sale-form,
+.waiter-workspace .fixed-qr-form {
+  display: grid;
+  gap: 12px;
+}
+
+.waiter-workspace .quick-sale-form {
+  padding: 14px;
+  border: 1px solid rgba(255, 183, 15, 0.24);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(255, 183, 15, 0.2), transparent 34%),
+    rgba(255, 250, 245, 0.72);
+}
+
+.waiter-workspace .fixed-qr-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  padding: 14px;
+  border: 1px dashed rgba(23, 100, 59, 0.28);
+  border-radius: 20px;
+  background: rgba(238, 249, 237, 0.74);
+}
+
+.waiter-workspace .fixed-qr-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.waiter-workspace .fixed-qr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid rgba(129, 78, 31, 0.12);
+  border-radius: 16px;
+  padding: 12px;
+  color: #2d160f;
+  background: #fffaf5;
+  text-align: left;
+}
+
+.waiter-workspace .fixed-qr-row.active {
+  border-color: rgba(255, 183, 15, 0.72);
+  box-shadow: inset 4px 0 0 #ffb70f;
+}
+
+.waiter-workspace .fixed-qr-row span {
+  font-weight: 950;
+}
+
+.waiter-workspace .fixed-qr-row small,
+.table-qr-link {
+  overflow: hidden;
+  color: #7a6254;
+  font-size: 0.8rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-qr-link {
+  display: block;
+  max-width: min(100%, 620px);
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: #17643b;
+  background: rgba(23, 100, 59, 0.08);
+  text-decoration: none;
+}
+
+.table-qr-link:hover {
+  color: #2d160f;
+  background: rgba(255, 183, 15, 0.18);
+}
+
+.inventory-editor-card {
+  scroll-margin-top: 110px;
+  border-color: rgba(255, 183, 15, 0.32);
+  box-shadow: 0 18px 60px rgba(71, 43, 17, 0.08);
+}
+
+.inventory-editor-card:focus-within {
+  border-color: rgba(255, 183, 15, 0.82);
+  box-shadow: 0 24px 80px rgba(255, 183, 15, 0.18);
+}
+
 .waiter-workspace .menu-dropdown {
   overflow: hidden;
 }
@@ -3643,6 +3776,11 @@ td small {
     margin-top: 4px;
   }
 
+  .waiter-workspace .fixed-qr-form,
+  .waiter-workspace .fixed-qr-row {
+    grid-template-columns: 1fr;
+  }
+
   .waiter-workspace .draft-order-row,
   .waiter-workspace .sent-order-row {
     grid-template-columns: 1fr;
@@ -3699,7 +3837,7 @@ td small {
   }
 
   .waiter-workspace .open-table-form {
-    grid-template-columns: repeat(3, minmax(160px, 1fr)) minmax(160px, auto);
+    grid-template-columns: repeat(4, minmax(140px, 1fr)) minmax(150px, auto);
   }
 
   .waiter-workspace .menu-product-grid.quick-menu-grid {
@@ -3754,7 +3892,7 @@ td small {
 /* Correção LoccoBurger - botão Abrir comanda cortado no desktop */
 @media (min-width: 681px) {
   .waiter-workspace .open-table-form {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 
   .waiter-workspace .open-table-form .primary-button {

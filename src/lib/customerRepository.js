@@ -1,3 +1,5 @@
+import { getLocalDateKey } from './dateUtils.js'
+
 export const defaultCustomerPromotions = [
   { id: 'volte10', label: 'Volte 10', type: 'Desconto', value: 10, channel: 'WhatsApp' },
   { id: 'combo15', label: 'Combo 15', type: 'Desconto', value: 15, channel: 'WhatsApp' },
@@ -94,7 +96,7 @@ export function createCustomerCampaign({ campaign, currentCampaigns, customers, 
     status: 'enviada',
     message: campaign.message.trim(),
     createdAt: now.toLocaleDateString('pt-BR'),
-    createdAtIso: now.toISOString().slice(0, 10),
+    createdAtIso: getLocalDateKey(now),
     time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   }
 }

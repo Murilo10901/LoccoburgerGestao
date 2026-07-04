@@ -14,6 +14,8 @@ import { Inventory } from './pages/Inventory.jsx'
 import { TechnicalSheet } from './pages/TechnicalSheet.jsx'
 import { Cashier } from './pages/Cashier.jsx'
 import { Customers } from './pages/Customers.jsx'
+import { CustomerQrMenu } from './pages/CustomerQrMenu.jsx'
+import { CustomerDeliveryMenu } from './pages/CustomerDeliveryMenu.jsx'
 import { AuthPage } from './pages/AuthPage.jsx'
 import { UserPermissions } from './pages/UserPermissions.jsx'
 import { Financial } from './pages/Financial.jsx'
@@ -27,6 +29,15 @@ import { loadCustomerDeliveryTables, saveCustomerDeliveryTables } from './lib/cu
 import { loadFinanceTables, saveFinanceTables } from './lib/financeSupabaseRepository.js'
 import { loadOperationTables, saveOperationTables } from './lib/operationSupabaseRepository.js'
 import { subscribeToSharedDataChanges } from './lib/realtimeSync.js'
+import { clearClientQrSession, loadClientQrOrders, saveClientQrOrders } from './lib/clientQrOrders.js'
+import { loadClientDeliveryOrders, saveClientDeliveryOrders, updateClientDeliveryOrder } from './lib/clientDeliveryOrders.js'
+import {
+  clearAdminNotifications,
+  loadAdminNotifications,
+  loadSeenAdminNotificationKeys,
+  saveAdminNotifications,
+  saveSeenAdminNotificationKeys,
+} from './lib/adminNotifications.js'
 import { loadUserProfile } from './lib/userProfileRepository.js'
 import { loadWhatsAppMessages, updateWhatsAppMessageStatus } from './lib/whatsappRepository.js'
 import { saveInventoryItem, saveProduct, toggleProductStatus } from './lib/catalogRepository.js'
@@ -46,7 +57,9 @@ import {
   removeIngredientFromSheet,
   updateTechnicalSheetDetails,
 } from './lib/technicalSheetRepository.js'
+import { getLocalDateKey } from './lib/dateUtils.js'
 import { applyModifierStockConsumption } from './lib/orderModifiers.js'
+import { loadStoredState } from './lib/storage.js'
 
 
 function normalizeRouteValue(value) {
@@ -62,6 +75,24 @@ function isManagementAreaRoute() {
   const currentHash = normalizeRouteValue(window.location.hash)
 
   return allowedRoutes.has(currentPath) || allowedRoutes.has(currentHash)
+}
+
+function isCustomerQrMenuRoute() {
+  if (typeof window === 'undefined') return false
+
+  const currentPath = normalizeRouteValue(window.location.pathname)
+  return currentPath === '/mesa' ||
+    currentPath.startsWith('/mesa/') ||
+    currentPath === '/cardapio-mesa' ||
+    currentPath.startsWith('/cardapio-mesa/') ||
+    currentPath === '/cardapio-cliente'
+}
+
+function isCustomerDeliveryRoute() {
+  if (typeof window === 'undefined') return false
+
+  const currentPath = normalizeRouteValue(window.location.pathname)
+  return currentPath === '/delivery'
 }
 
 const meatPoints = [
@@ -107,6 +138,7 @@ const menuHighlights = [
 ]
 
 const orderCategories = ['Todos', 'Especiais', 'Smash', 'Porções']
+const appCurrency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const orderProducts = [
   {
@@ -155,6 +187,7 @@ function CursorTrail() {
       '.locco-premium-food-stage',
       '.locco-premium-section',
       '.locco-premium-cards article',
+      '.locco-premium-app-section',
       '.locco-premium-meat-selector',
       '.locco-premium-meat-stack',
       '.locco-premium-meat-copy',
@@ -182,7 +215,7 @@ function CursorTrail() {
 
     revealElements.forEach((element, index) => {
       element.setAttribute('data-locco-reveal', '')
-      element.style.setProperty('--locco-reveal-delay', `${Math.min(index * 65, 520)}ms`)
+      element.style.setProperty('--locco-reveal-delay', `${Math.min(index * 30, 210)}ms`)
     })
     document.documentElement.classList.add('loccoburger-motion-ready')
 
@@ -210,7 +243,7 @@ function CursorTrail() {
           }
         })
       },
-      { rootMargin: '0px 0px -8% 0px', threshold: 0.14 },
+      { rootMargin: '0px 0px -2% 0px', threshold: 0.06 },
     )
 
     revealElements.forEach((element) => observer.observe(element))
@@ -243,6 +276,8 @@ function CursorTrail() {
     let width = 0
     let height = 0
     let pixelRatio = 1
+    let isAnimating = false
+    let lastMoveAt = 0
 
     const resizeCanvas = () => {
       width = window.innerWidth
@@ -258,50 +293,72 @@ function CursorTrail() {
     const clearTrail = () => {
       lastPoint = null
       currentPoint = null
+      context.clearRect(0, 0, width, height)
       if (cursorDot) {
         cursorDot.style.opacity = '0'
       }
     }
 
+    const startPaint = () => {
+      if (isAnimating) return
+      isAnimating = true
+      animationFrame = window.requestAnimationFrame(paint)
+    }
+
     const updatePointer = (event) => {
       currentPoint = { x: event.clientX, y: event.clientY }
+      lastMoveAt = Date.now()
       if (cursorDot) {
         cursorDot.style.opacity = '1'
         cursorDot.style.transform = `translate3d(${event.clientX}px, ${event.clientY}px, 0) translate(-50%, -50%)`
       }
+      startPaint()
     }
 
     const paint = () => {
       context.globalCompositeOperation = 'destination-out'
-      context.fillStyle = 'rgba(0, 0, 0, 0.09)'
+      context.fillStyle = 'rgba(0, 0, 0, 0.24)'
       context.fillRect(0, 0, width, height)
 
       if (currentPoint) {
         const previousPoint = lastPoint ?? currentPoint
         const gradient = context.createLinearGradient(previousPoint.x, previousPoint.y, currentPoint.x, currentPoint.y)
-        gradient.addColorStop(0, 'rgba(255, 198, 47, 0.04)')
-        gradient.addColorStop(0.72, 'rgba(255, 198, 47, 0.52)')
-        gradient.addColorStop(1, 'rgba(255, 248, 210, 0.92)')
+        gradient.addColorStop(0, 'rgba(255, 198, 47, 0.02)')
+        gradient.addColorStop(0.72, 'rgba(255, 198, 47, 0.38)')
+        gradient.addColorStop(1, 'rgba(255, 248, 210, 0.74)')
 
         context.globalCompositeOperation = 'source-over'
         context.beginPath()
         context.moveTo(previousPoint.x, previousPoint.y)
         context.lineTo(currentPoint.x, currentPoint.y)
         context.lineCap = 'round'
-        context.lineWidth = 2.4
+        context.lineWidth = 2
         context.strokeStyle = gradient
-        context.shadowBlur = 13
-        context.shadowColor = 'rgba(255, 183, 24, 0.55)'
+        context.shadowBlur = 7
+        context.shadowColor = 'rgba(255, 183, 24, 0.36)'
         context.stroke()
         context.shadowBlur = 0
         lastPoint = currentPoint
+      }
+
+      const idleFor = Date.now() - lastMoveAt
+      if (idleFor > 150) {
+        currentPoint = null
+        lastPoint = null
+        if (cursorDot) cursorDot.style.opacity = '0'
+      }
+
+      if (idleFor > 520) {
+        context.clearRect(0, 0, width, height)
+        isAnimating = false
+        animationFrame = 0
+        return
       }
 
       animationFrame = window.requestAnimationFrame(paint)
     }
 
     resizeCanvas()
-    paint()
     window.addEventListener('resize', resizeCanvas)
     window.addEventListener('pointermove', updatePointer, { passive: true })
     window.addEventListener('blur', clearTrail)
@@ -327,6 +384,8 @@ function LandingMaintenancePage() {
   const whatsappNumber = '5511993278115'
   const whatsappMessage = encodeURIComponent('Ola, vim pelo site do LoccoBurger e quero fazer um pedido.')
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
+  const deliveryUrl = '/delivery'
+  const adminUrl = '/admin'
   const mapsUrl = 'https://maps.app.goo.gl/rCcrYsNCDD6WdvZZA'
   const [heroPhotoLoaded, setHeroPhotoLoaded] = useState(false)
   const [placePhotoLoaded, setPlacePhotoLoaded] = useState(false)
@@ -380,19 +439,23 @@ function LandingMaintenancePage() {
         <h2>Monte seu pedido em uma tela de app premium.</h2>
         <p>
           Essa é a tela demonstrativa do autoatendimento: o cliente escolhe o lanche, envia o pedido,
-          o garçom aprova e a cozinha recebe na gestão.
+          o garçom aprova e a cozinha recebe na gestão. Serve para mesa, retirada, estacionamento e delivery.
         </p>
 
         <div className="locco-premium-order-flow" aria-label="Fluxo do pedido digital">
           <span>QR Code</span>
           <span>Cliente escolhe</span>
+          <span>ChatGPT ajuda</span>
           <span>Garçom aprova</span>
           <span>Cozinha recebe</span>
         </div>
 
         <div className="locco-premium-actions">
-          <a className="locco-premium-primary" href={whatsappUrl} target="_blank" rel="noreferrer">
-            Enviar teste pelo WhatsApp
+          <a className="locco-premium-primary" href={deliveryUrl}>
+            Fazer pedido no delivery
+          </a>
+          <a className="locco-premium-secondary" href={whatsappUrl} target="_blank" rel="noreferrer">
+            Pedir pelo WhatsApp
           </a>
           <button className="locco-premium-secondary locco-premium-ghost-button" type="button" onClick={closeOrderScreen}>
             Voltar ao site
@@ -472,8 +535,8 @@ function LandingMaintenancePage() {
             <strong>{selectedOrderProduct.price}</strong>
           </div>
 
-          <a className="locco-premium-order-now" href={whatsappUrl} target="_blank" rel="noreferrer">
-            Enviar pedido
+          <a className="locco-premium-order-now" href={deliveryUrl}>
+            Fazer pedido
           </a>
         </article>
       </div>
@@ -512,15 +575,18 @@ function LandingMaintenancePage() {
           <nav aria-label="Navegacao do site LoccoBurger">
             <a href="#quem-somos">Quem somos</a>
             <a href="#brasa">Na brasa</a>
+            <a href={deliveryUrl}>Delivery</a>
             <a href="#pedido" onClick={openOrderScreen}>Pedido</a>
             <a href="#ponto-da-carne">Ponto da carne</a>
             <a href="#cardapio">Cardápio</a>
             <a href="#localizacao">Localização</a>
           </nav>
 
-          <a className="locco-premium-order-link" href="#pedido" onClick={openOrderScreen}>
-            Fazer pedido
-          </a>
+          <div className="locco-premium-header-actions">
+            <a className="locco-premium-order-link" href="#pedido" onClick={openOrderScreen}>
+              Ver app
+            </a>
+          </div>
         </header>
 
         <div className="locco-premium-hero-grid">
@@ -541,14 +607,15 @@ function LandingMaintenancePage() {
             </div>
 
             <div className="locco-premium-actions">
-              <a className="locco-premium-primary" href="#pedido" onClick={openOrderScreen}>Fazer pedido agora</a>
+              <a className="locco-premium-primary" href={deliveryUrl}>Fazer pedido delivery</a>
+              <a className="locco-premium-secondary" href="#pedido" onClick={openOrderScreen}>Ver app de pedidos</a>
               <a className="locco-premium-secondary" href={mapsUrl} target="_blank" rel="noreferrer">Ver localização</a>
             </div>
 
             <div className="locco-premium-tags" aria-label="Diferenciais LoccoBurger">
               <span>Carne na brasa</span>
               <span>Ingredientes frescos</span>
-              <span>Atendimento no local</span>
+              <span>Delivery online</span>
             </div>
           </section>
 
@@ -613,6 +680,34 @@ function LandingMaintenancePage() {
           <h3>Variedade Locco</h3>
           <p>Combinações para diferentes fomes e momentos, sempre com a personalidade da casa.</p>
         </article>
+      </section>
+
+      <section className="locco-premium-app-section" id="delivery">
+        <div className="locco-premium-app-copy">
+          <p className="locco-premium-kicker">Novo app de pedidos</p>
+          <h2>Peça pelo delivery, na mesa ou até no estacionamento.</h2>
+          <p>
+            O LoccoBurger agora tem uma interface própria para pedidos: você monta o carrinho,
+            acompanha o status e escolhe se quer retirar, receber no delivery ou pedir ajuda no atendimento.
+          </p>
+          <div className="locco-premium-app-options">
+            <span>Delivery online</span>
+            <span>QR Code na mesa</span>
+            <span>Pedido no estacionamento</span>
+            <span>Atendimento assistido por ChatGPT</span>
+          </div>
+          <div className="locco-premium-actions">
+            <a className="locco-premium-primary" href={deliveryUrl}>Fazer pedido pelo delivery</a>
+            <a className="locco-premium-secondary" href="#pedido" onClick={openOrderScreen}>Ver interface do app</a>
+          </div>
+        </div>
+
+        <div className="locco-premium-app-card" aria-label="Interface de pedidos LoccoBurger">
+          <span>Pedido Locco</span>
+          <strong>Escolha, envie e acompanhe.</strong>
+          <small>Pedido chega no atendimento, passa pela cozinha e atualiza o status para o cliente.</small>
+          <a href={deliveryUrl}>Abrir delivery</a>
+        </div>
       </section>
 
       <section className="locco-premium-meat-section" id="ponto-da-carne">
@@ -680,7 +775,7 @@ function LandingMaintenancePage() {
             A maionese artesanal da LoccoBurger chega com toque suave, textura cremosa e aquele sabor
             de acompanhamento que faz a porção de batata sumir da mesa rapidinho.
           </p>
-          <a className="locco-premium-secondary" href={whatsappUrl} target="_blank" rel="noreferrer">
+          <a className="locco-premium-secondary" href={deliveryUrl}>
             Pedir com maionese da casa
           </a>
         </div>
@@ -701,18 +796,18 @@ function LandingMaintenancePage() {
       <section className="locco-premium-menu-section" id="cardapio">
         <div className="locco-premium-menu-copy">
           <p className="locco-premium-kicker">Cardápio</p>
-          <h2>Escolha seu Locco favorito e peça pelo WhatsApp.</h2>
+          <h2>Escolha seu Locco favorito e peça pelo app.</h2>
           <p>
             Tem burger clássico, smash, especiais da casa, porção de batata e bebidas. Dá uma olhada
-            no cardápio e chama a gente para montar seu pedido.
+            no cardápio e faça seu pedido direto pela nova interface de delivery.
           </p>
           <div className="locco-premium-menu-highlights" aria-label="Destaques do cardápio">
             {menuHighlights.map((item) => (
               <span key={item}>{item}</span>
             ))}
           </div>
-          <a className="locco-premium-primary" href={whatsappUrl} target="_blank" rel="noreferrer">
-            Ver cardápio e pedir
+          <a className="locco-premium-primary" href={deliveryUrl}>
+            Fazer pedido no delivery
           </a>
         </div>
 
@@ -740,7 +835,8 @@ function LandingMaintenancePage() {
           <h2>Um lugar para chegar, pedir e curtir um burger de brasa.</h2>
           <p>
             Estamos sempre à disposição para receber você, preparar seu pedido com cuidado e entregar uma experiência
-            que combine comida boa, ambiente direto e o estilo LoccoBurger.
+            que combine comida boa, ambiente direto e o estilo LoccoBurger. Se estiver no estacionamento,
+            peça pela nova interface e acompanhe o andamento sem sair do lugar.
           </p>
         </div>
       </section>
@@ -751,7 +847,8 @@ function LandingMaintenancePage() {
           <h2>Estamos em Santo André.</h2>
           <p>Av. Nova Iorque, 304 - Santo André, Brazil</p>
           <div className="locco-premium-actions compact">
-            <a className="locco-premium-primary" href={whatsappUrl} target="_blank" rel="noreferrer">Pedir pelo WhatsApp</a>
+            <a className="locco-premium-primary" href={deliveryUrl}>Fazer pedido pelo app</a>
+            <a className="locco-premium-secondary" href={whatsappUrl} target="_blank" rel="noreferrer">Pedir pelo WhatsApp</a>
             <a className="locco-premium-secondary" href={mapsUrl} target="_blank" rel="noreferrer">Abrir no Maps</a>
           </div>
         </div>
@@ -773,6 +870,13 @@ function LandingMaintenancePage() {
       <footer className="locco-premium-footer">
         <span>© {currentYear} LoccoBurger</span>
         <strong>Hamburgueria artesanal na brasa.</strong>
+        <small>Todos os direitos reservados.</small>
+        <nav aria-label="Contato LoccoBurger">
+          <a href="https://www.instagram.com/loccoburger" target="_blank" rel="noreferrer">Instagram</a>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer">WhatsApp</a>
+          <a href="mailto:loccoburgercontato@gmail.com">E-mail</a>
+          <a className="locco-premium-admin-footer-link" href={adminUrl}>Pagina de adm</a>
+        </nav>
       </footer>
     </main>
   )
@@ -785,6 +889,7 @@ const initialExpenses = [
 
 const kitchenStatusFlow = ['em preparo', 'finalizado']
 const remoteSyncIntervalMs = 3500
+const localWriteSyncGuardMs = 2600
 const deviceViewStorageKey = 'loccoburger-device-view'
 
 const deviceViewOptions = [
@@ -801,6 +906,66 @@ const syncStatusLabels = {
   updating: 'Sincronizando',
   fallback: 'Sync por intervalo',
   error: 'Sync instavel',
+}
+
+const clientDeliveryStatusRank = {
+  novo: 0,
+  aprovado: 1,
+  preparando: 2,
+  pronto: 3,
+  despachado: 4,
+  entregue: 5,
+  recusado: 6,
+  cancelado: 6,
+}
+
+function mapAdminDeliveryStatusToClientStatus(status) {
+  return status === 'novo' ? 'aprovado' : status
+}
+
+function getClientDeliveryPatchFromAdminOrder(order, now = Date.now()) {
+  const clientStatus = mapAdminDeliveryStatusToClientStatus(order?.status)
+  const statusMessages = {
+    aprovado: 'A loja aceitou seu pedido. Ele ja foi enviado para a cozinha.',
+    preparando: 'Seu pedido esta em preparo na cozinha.',
+    pronto: 'Seu pedido ficou pronto e esta aguardando saida.',
+    despachado: 'Seu pedido saiu para entrega. Previsao de chegada em ate 30 minutos.',
+    entregue: 'Pedido entregue. Bom apetite!',
+  }
+
+  return {
+    status: clientStatus,
+    eta: order?.eta ?? (clientStatus === 'entregue' ? 'Finalizado' : '35 min'),
+    adminDeliveryId: order?.id,
+    adminMessage: statusMessages[clientStatus] ?? 'Pedido atualizado pela loja.',
+    updatedAt: new Date(now).toISOString(),
+    dispatchedAt: clientStatus === 'despachado' ? new Date(now).toISOString() : undefined,
+    deliveryAutoCompleteAt: clientStatus === 'despachado' ? now + 30 * 60 * 1000 : undefined,
+    deliveredAt: clientStatus === 'entregue' ? new Date(now).toISOString() : undefined,
+  }
+}
+
+function shouldSyncClientDeliveryOrder(clientOrder, nextStatus) {
+  if (!clientOrder || !nextStatus) return false
+  if (['recusado', 'cancelado'].includes(clientOrder.status)) return false
+
+  const currentRank = clientDeliveryStatusRank[clientOrder.status] ?? -1
+  const nextRank = clientDeliveryStatusRank[nextStatus] ?? currentRank
+  return nextRank >= currentRank
+}
+
+function findLinkedClientDeliveryOrder(deliveryOrder, clientOrders = []) {
+  if (!deliveryOrder) return null
+
+  if (deliveryOrder.clientDeliveryOrderId) {
+    const linkedByDelivery = clientOrders.find((order) => order.id === deliveryOrder.clientDeliveryOrderId)
+    if (linkedByDelivery) return linkedByDelivery
+  }
+
+  const linkedByClient = clientOrders.find((order) => order.adminDeliveryId === deliveryOrder.id)
+  if (linkedByClient) return linkedByClient
+
+  return null
 }
 
 const accessProfiles = {
@@ -891,11 +1056,156 @@ function normalizeKitchenOrder(order) {
 }
 
 function createDefaultTablesState() {
-  return tables.map((table) => ({
-    ...table,
-    orderItems: [],
-    tabs: [{ id: `${table.id}-mesa`, name: 'Mesa', orderItems: [] }],
-  }))
+  return Array.from({ length: 4 }, (_, index) => {
+    const tableNumber = String(index + 1)
+    const tableLabel = `Mesa ${tableNumber}`
+
+    return {
+      id: index + 1,
+      guests: 0,
+      status: 'livre',
+      attendant: '-',
+      total: 0,
+      customerName: '',
+      tableNumber,
+      tableLabel,
+      dynamic: false,
+      fixedQr: true,
+      orderItems: [],
+      tabs: [{
+        id: `${index + 1}-mesa`,
+        name: 'Mesa',
+        orderItems: [],
+        tableNumber,
+        tableLabel,
+        dynamic: false,
+        fixedQr: true,
+      }],
+    }
+  })
+}
+
+const legacyMockTableBlueprint = new Map(tables.map((table) => [Number(table.id), table]))
+
+function tableHasOrderItems(table) {
+  return (table?.orderItems ?? []).length > 0 ||
+    (table?.tabs ?? []).some((tab) => (tab.orderItems ?? []).length > 0)
+}
+
+function isLegacyMockTable(table) {
+  const blueprint = legacyMockTableBlueprint.get(Number(table?.id))
+  if (!blueprint) return false
+
+  const hasRealItems = tableHasOrderItems(table)
+  const hasCustomerName = String(table?.customerName ?? getTableMainTab(table)?.customerName ?? '').trim().length > 0
+  const sameStatus = String(table.status ?? '') === String(blueprint.status ?? '')
+  const sameAttendant = String(table.attendant ?? '-') === String(blueprint.attendant ?? '-')
+  const sameTotal = Number(table.total || 0) === Number(blueprint.total || 0)
+  const noQrMetadata = !table.tableNumber && !table.tableLabel && !table.fixedQr
+  const emptyResetLegacyTable = Number(table.id) > 4 &&
+    Number(table.id) <= 10 &&
+    noQrMetadata &&
+    !hasRealItems &&
+    !hasCustomerName &&
+    String(table.status ?? 'livre') === 'livre' &&
+    Number(table.total || 0) === 0
+
+  return (!hasRealItems && !hasCustomerName && sameStatus && sameAttendant && sameTotal && noQrMetadata) ||
+    emptyResetLegacyTable
+}
+
+function getNormalizedTableNumber(table) {
+  const mainTab = getTableMainTab(table)
+  return String(table?.tableNumber ?? mainTab?.tableNumber ?? '').trim()
+}
+
+function getTableDeduplicationKey(table) {
+  const tableNumber = getNormalizedTableNumber(table)
+  if (tableNumber) return `mesa:${tableNumber}`
+
+  const customerName = String(table?.customerName ?? getTableMainTab(table)?.customerName ?? '').trim().toLowerCase()
+  if (customerName) return `comanda:${customerName}:${table.id}`
+
+  return `id:${table.id}`
+}
+
+function getTableKeepScore(table) {
+  const tableNumber = getNormalizedTableNumber(table)
+  const idMatchesQr = tableNumber && Number(tableNumber) === Number(table.id)
+
+  return (tableHasOrderItems(table) ? 100 : 0) +
+    (Number(table.total || 0) > 0 ? 80 : 0) +
+    (table.status && table.status !== 'livre' ? 60 : 0) +
+    (String(table.customerName ?? getTableMainTab(table)?.customerName ?? '').trim() ? 50 : 0) +
+    (table.fixedQr ? 30 : 0) +
+    (idMatchesQr ? 10 : 0)
+}
+
+function normalizeTableRecord(table) {
+  const mainTab = getTableMainTab(table)
+  const fixedQr = Boolean(table.fixedQr)
+  const tableNumber = String(table.tableNumber ?? mainTab?.tableNumber ?? (fixedQr ? table.id : '')).trim()
+  const tableLabel = String(table.tableLabel ?? mainTab?.tableLabel ?? (fixedQr && tableNumber ? `Mesa ${tableNumber}` : '')).trim()
+  const tableId = Number(table.id) || Date.now()
+  const metadata = {
+    customerName: table.customerName ?? mainTab?.customerName ?? '',
+    customerPhone: table.customerPhone ?? mainTab?.customerPhone ?? '',
+    tableNumber,
+    tableLabel,
+    dynamic: Boolean(table.dynamic),
+    fixedQr,
+  }
+
+  return applyTableSessionMetadata({
+    id: tableId,
+    guests: Number(table.guests || 0),
+    status: table.status ?? 'livre',
+    attendant: table.attendant ?? '-',
+    total: Number(table.total || 0),
+    orderItems: table.orderItems ?? mainTab?.orderItems ?? [],
+    tabs: table.tabs?.length
+      ? table.tabs
+      : [createMainTableTab(tableId, metadata, table.orderItems ?? [])],
+    fixedQr,
+  }, metadata)
+}
+
+function normalizeTablesState(currentTables = []) {
+  if (!Array.isArray(currentTables) || currentTables.length === 0) return createDefaultTablesState()
+
+  const legacyTables = currentTables.filter(isLegacyMockTable)
+  const looksLikeOriginalMockState = currentTables.length === legacyMockTableBlueprint.size &&
+    legacyTables.length >= legacyMockTableBlueprint.size - 1
+
+  if (looksLikeOriginalMockState) return createDefaultTablesState()
+
+  const defaultFixedTables = createDefaultTablesState()
+  const normalizedTables = currentTables
+    .filter((table) => !isLegacyMockTable(table) || Number(table.id) <= 4)
+    .map((table) => {
+      const defaultTable = defaultFixedTables.find((item) => item.id === Number(table.id))
+      return defaultTable && isLegacyMockTable(table) ? defaultTable : normalizeTableRecord(table)
+    })
+
+  const dedupedTables = Array.from(
+    normalizedTables.reduce((tableMap, table) => {
+      const tableKey = getTableDeduplicationKey(table)
+      const currentTable = tableMap.get(tableKey)
+
+      if (!currentTable || getTableKeepScore(table) > getTableKeepScore(currentTable)) {
+        tableMap.set(tableKey, table)
+      }
+
+      return tableMap
+    }, new Map()).values(),
+  )
+
+  return dedupedTables.sort((first, second) => {
+    const firstNumber = Number(first.tableNumber ?? first.id)
+    const secondNumber = Number(second.tableNumber ?? second.id)
+    if (Number.isFinite(firstNumber) && Number.isFinite(secondNumber)) return firstNumber - secondNumber
+    return String(getTableSessionLabel(first)).localeCompare(String(getTableSessionLabel(second)))
+  })
 }
 
 function getTableMainTab(table) {
@@ -923,9 +1233,11 @@ function createMainTableTab(tableId, metadata = {}, orderItems = []) {
     name: metadata.customerName || 'Mesa',
     orderItems,
     customerName: metadata.customerName || '',
+    customerPhone: metadata.customerPhone || '',
     tableNumber: metadata.tableNumber || '',
     tableLabel: metadata.tableLabel || '',
     dynamic: Boolean(metadata.dynamic),
+    fixedQr: Boolean(metadata.fixedQr),
   }
 }
 
@@ -940,18 +1252,22 @@ function applyTableSessionMetadata(table, metadata = {}) {
   return {
     ...table,
     customerName: metadata.customerName || '',
+    customerPhone: metadata.customerPhone || '',
     tableNumber: metadata.tableNumber || '',
     tableLabel: metadata.tableLabel || '',
     dynamic: Boolean(metadata.dynamic),
+    fixedQr: Boolean(metadata.fixedQr ?? table.fixedQr),
     tabs: normalizedTabs.map((tab) =>
       tab.id === mainTabId || tab.name === 'Mesa'
         ? {
             ...tab,
             name: metadata.customerName || tab.name || 'Mesa',
             customerName: metadata.customerName || '',
+            customerPhone: metadata.customerPhone || '',
             tableNumber: metadata.tableNumber || '',
             tableLabel: metadata.tableLabel || '',
             dynamic: Boolean(metadata.dynamic),
+            fixedQr: Boolean(metadata.fixedQr ?? table.fixedQr),
           }
         : tab,
     ),
@@ -986,6 +1302,7 @@ function mergeOfficialProducts(currentProducts = []) {
       const currentProduct = currentProducts.find((item) => item.id === product.id)
       return {
         ...product,
+        ...(currentProduct ?? {}),
         active: currentProduct?.active ?? product.active,
       }
     }),
@@ -1027,9 +1344,17 @@ function normalizeAppState(state) {
     ...state,
     inventory: mergeOfficialInventory(state.inventory),
     technicalSheets: mergeOfficialTechnicalSheets(state.technicalSheets),
+    tables: normalizeTablesState(state.tables),
     kitchen: (state.kitchen ?? []).map(normalizeKitchenOrder),
     products: mergeOfficialProducts(state.products ?? products),
   }
+}
+
+function getPublicProductsSnapshot() {
+  if (typeof window === 'undefined') return products
+
+  const storedState = loadStoredState()
+  return mergeOfficialProducts(storedState?.products ?? products)
 }
 
 function createStateSignature(value) {
@@ -1037,6 +1362,14 @@ function createStateSignature(value) {
 }
 
 export default function App({ icons, hooks }) {
+  if (isCustomerDeliveryRoute()) {
+    return <CustomerDeliveryMenu products={getPublicProductsSnapshot()} />
+  }
+
+  if (isCustomerQrMenuRoute()) {
+    return <CustomerQrMenu products={getPublicProductsSnapshot()} />
+  }
+
   if (!isManagementAreaRoute()) {
     return <LandingMaintenancePage />
   }
@@ -1065,6 +1398,7 @@ export default function App({ icons, hooks }) {
   const whatsappHydratedRef = hooks.useRef(false)
   const appStateRef = hooks.useRef(null)
   const remoteSyncRunningRef = hooks.useRef(false)
+  const lastLocalWriteAtRef = hooks.useRef(0)
   const saveStatusRef = hooks.useRef(saveStatus)
   const repositoryStatus = hooks.useMemo(() => getRepositoryStatus(currentUser, saveStatus), [currentUser, saveStatus])
   const [activePage, setActivePage] = hooks.useState('dashboard')
@@ -1084,6 +1418,11 @@ export default function App({ icons, hooks }) {
   const [whatsAppInboxState, setWhatsAppInboxState] = hooks.useState(defaultAppState.whatsAppInbox ?? [])
   const [productsState, setProductsState] = hooks.useState(defaultAppState.products ?? products)
   const [purchaseOrdersState, setPurchaseOrdersState] = hooks.useState(defaultAppState.purchaseOrders)
+  const [clientQrOrdersState, setClientQrOrdersState] = hooks.useState(() => loadClientQrOrders())
+  const [clientDeliveryOrdersState, setClientDeliveryOrdersState] = hooks.useState(() => loadClientDeliveryOrders())
+  const [adminNotificationsState, setAdminNotificationsState] = hooks.useState(() => loadAdminNotifications().items)
+  const notificationSeenKeysRef = useRef(loadSeenAdminNotificationKeys())
+  const kitchenNotificationsPrimedRef = useRef(false)
 
   const navigation = hooks.useMemo(
     () => [
@@ -1153,6 +1492,170 @@ export default function App({ icons, hooks }) {
     saveStatusRef.current = saveStatus
   }, [saveStatus])
 
+  hooks.useEffect(() => {
+    const syncClientQrOrders = () => setClientQrOrdersState(loadClientQrOrders())
+    const intervalId = window.setInterval(syncClientQrOrders, 1500)
+
+    window.addEventListener('storage', syncClientQrOrders)
+    window.addEventListener('loccoburger:client-qr-orders-updated', syncClientQrOrders)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('storage', syncClientQrOrders)
+      window.removeEventListener('loccoburger:client-qr-orders-updated', syncClientQrOrders)
+    }
+  }, [])
+
+  hooks.useEffect(() => {
+    const syncClientDeliveryOrders = () => setClientDeliveryOrdersState(loadClientDeliveryOrders())
+    const intervalId = window.setInterval(syncClientDeliveryOrders, 1500)
+
+    window.addEventListener('storage', syncClientDeliveryOrders)
+    window.addEventListener('loccoburger:client-delivery-orders-updated', syncClientDeliveryOrders)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('storage', syncClientDeliveryOrders)
+      window.removeEventListener('loccoburger:client-delivery-orders-updated', syncClientDeliveryOrders)
+    }
+  }, [])
+
+  hooks.useEffect(() => {
+    if (!deliveryState.length || !clientDeliveryOrdersState.length) return
+
+    const storedClientOrders = loadClientDeliveryOrders()
+    if (!storedClientOrders.length) return
+
+    let clientOrdersChanged = false
+    let deliveryLinksChanged = false
+    const now = Date.now()
+
+    const reconciledClientOrders = storedClientOrders.map((clientOrder) => {
+      const linkedDeliveryOrder = deliveryState.find((deliveryOrder) =>
+        deliveryOrder.clientDeliveryOrderId === clientOrder.id ||
+        clientOrder.adminDeliveryId === deliveryOrder.id,
+      )
+
+      if (!linkedDeliveryOrder) return clientOrder
+
+      const patch = getClientDeliveryPatchFromAdminOrder(linkedDeliveryOrder, now)
+      const nextStatus = patch.status
+      const shouldAdvanceStatus = clientOrder.status !== nextStatus &&
+        shouldSyncClientDeliveryOrder(clientOrder, nextStatus)
+      const shouldAttachAdminId = !clientOrder.adminDeliveryId && patch.adminDeliveryId
+
+      if (!shouldAdvanceStatus && !shouldAttachAdminId) return clientOrder
+
+      clientOrdersChanged = true
+      if (!shouldAdvanceStatus) {
+        return { ...clientOrder, adminDeliveryId: patch.adminDeliveryId }
+      }
+
+      return Object.entries(patch).reduce((nextOrder, [key, value]) => {
+        if (value !== undefined) nextOrder[key] = value
+        return nextOrder
+      }, { ...clientOrder })
+    })
+
+    const nextDeliveryState = deliveryState.map((deliveryOrder) => {
+      if (deliveryOrder.clientDeliveryOrderId) return deliveryOrder
+
+      const linkedClientOrder = findLinkedClientDeliveryOrder(deliveryOrder, reconciledClientOrders)
+      if (!linkedClientOrder) return deliveryOrder
+
+      deliveryLinksChanged = true
+      return { ...deliveryOrder, clientDeliveryOrderId: linkedClientOrder.id }
+    })
+
+    if (clientOrdersChanged) {
+      const savedOrders = saveClientDeliveryOrders(reconciledClientOrders)
+      setClientDeliveryOrdersState(savedOrders)
+    }
+
+    if (deliveryLinksChanged) {
+      setDeliveryState(nextDeliveryState)
+    }
+  }, [clientDeliveryOrdersState, deliveryState])
+
+  function pushAdminNotification(notification) {
+    const notificationKey = notification.key ?? notification.id
+    if (!notificationKey || notificationSeenKeysRef.current.includes(notificationKey)) return
+
+    const nextNotification = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      createdAt: new Date().toISOString(),
+      ...notification,
+      key: notificationKey,
+    }
+    const nextSeenKeys = saveSeenAdminNotificationKeys([notificationKey, ...notificationSeenKeysRef.current])
+    notificationSeenKeysRef.current = nextSeenKeys
+
+    setAdminNotificationsState((currentNotifications) => {
+      const nextNotifications = [nextNotification, ...currentNotifications].slice(0, 120)
+      saveAdminNotifications(nextNotifications)
+      return nextNotifications
+    })
+  }
+
+  function handleClearAdminNotifications() {
+    const payload = clearAdminNotifications()
+    setAdminNotificationsState(payload.items)
+    return { ok: true, message: 'Notificacoes limpas.' }
+  }
+
+  hooks.useEffect(() => {
+    clientQrOrdersState
+      .filter((order) => order.status === 'novo')
+      .forEach((order) => {
+        pushAdminNotification({
+          key: `qr:${order.id}`,
+          type: order.type === 'fechamento' ? 'fechamento' : 'mesa',
+          title: order.type === 'fechamento' ? 'Fechamento solicitado' : 'Novo pedido QR',
+          message: `Mesa ${order.tableNumber} - ${order.customerName}`,
+          targetPage: order.type === 'fechamento' ? 'caixa' : 'mesas',
+        })
+      })
+  }, [clientQrOrdersState])
+
+  hooks.useEffect(() => {
+    clientDeliveryOrdersState
+      .filter((order) => order.status === 'novo')
+      .forEach((order) => {
+        pushAdminNotification({
+          key: `delivery:${order.id}`,
+          type: 'delivery',
+          title: 'Novo pedido delivery',
+          message: `${order.customerName} - ${appCurrency.format(order.total || 0)}`,
+          targetPage: 'delivery',
+        })
+      })
+  }, [clientDeliveryOrdersState])
+
+  hooks.useEffect(() => {
+    if (!dataReady) return
+
+    const activeKitchenOrders = kitchenState.filter((order) => order.status === 'em preparo')
+    if (!kitchenNotificationsPrimedRef.current) {
+      const primedKeys = activeKitchenOrders.map((order) => `kitchen:${order.id}`)
+      notificationSeenKeysRef.current = saveSeenAdminNotificationKeys([
+        ...primedKeys,
+        ...notificationSeenKeysRef.current,
+      ])
+      kitchenNotificationsPrimedRef.current = true
+      return
+    }
+
+    activeKitchenOrders.forEach((order) => {
+      pushAdminNotification({
+        key: `kitchen:${order.id}`,
+        type: 'cozinha',
+        title: 'Pedido novo na cozinha',
+        message: `${order.source} - ${order.item}`,
+        targetPage: 'cozinha',
+      })
+    })
+  }, [dataReady, kitchenState])
+
   function applyAppState(state) {
     const nextState = normalizeAppState(state ?? defaultAppState)
     setInventoryState(nextState.inventory)
@@ -1176,6 +1679,7 @@ export default function App({ icons, hooks }) {
     const normalizedState = normalizeAppState(nextState)
     appStateRef.current = normalizedState
     applyAppState(normalizedState)
+    lastLocalWriteAtRef.current = Date.now()
     setSaveStatus('saving')
 
     const saveJobs = [saveAppState(normalizedState)]
@@ -1221,12 +1725,18 @@ export default function App({ icons, hooks }) {
     const normalizedState = normalizeAppState(nextState)
     appStateRef.current = normalizedState
     applyAppState(normalizedState)
+    lastLocalWriteAtRef.current = Date.now()
     setSaveStatus('saving')
 
     const saveJobs = [saveAppState(normalizedState)]
 
     if (currentUser) {
       saveJobs.push(
+        saveCatalogTables({
+          inventory: normalizedState.inventory ?? [],
+          products: normalizedState.products ?? [],
+          technicalSheets: normalizedState.technicalSheets ?? [],
+        }),
         saveCustomerDeliveryTables({
           customers: normalizedState.customers ?? [],
           customerCampaigns: normalizedState.customerCampaigns ?? [],
@@ -1383,6 +1893,7 @@ export default function App({ icons, hooks }) {
 
   async function refreshSharedDataFromSupabase() {
     if (remoteSyncRunningRef.current || saveStatusRef.current === 'saving') return
+    if (Date.now() - lastLocalWriteAtRef.current < localWriteSyncGuardMs) return
     remoteSyncRunningRef.current = true
 
     try {
@@ -1476,7 +1987,7 @@ export default function App({ icons, hooks }) {
 
       if (operationResult.ok && operationResult.hasData) {
         const remoteOperation = {
-          tables: operationResult.data.tables,
+          tables: normalizeTablesState(operationResult.data.tables),
           kitchen: operationResult.data.kitchen,
         }
         const currentOperation = {
@@ -1845,35 +2356,88 @@ export default function App({ icons, hooks }) {
     )
   }
 
-  function handleSaveProduct(product) {
+  async function handleSaveProduct(product) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentProducts = currentState.products ?? productsState
+    const currentSheets = currentState.technicalSheets ?? technicalSheetsState
     const shouldCreateSheet = product.recipeId === 'new-sheet'
     const productId = product.id ? Number(product.id) : Date.now()
+    let nextTechnicalSheets = currentSheets
     let nextRecipeId = product.recipeId
 
     if (shouldCreateSheet) {
-      const newSheet = createEmptyTechnicalSheet({ currentSheets: technicalSheetsState, productId })
+      const newSheet = createEmptyTechnicalSheet({ currentSheets, productId })
       nextRecipeId = newSheet.id
-      setTechnicalSheetsState((currentSheets) => [newSheet, ...currentSheets])
+      nextTechnicalSheets = [newSheet, ...currentSheets]
     }
 
-    setProductsState((currentProducts) =>
-      saveProduct({
-        currentProducts,
-        product: {
-          ...product,
-          id: productId,
-          recipeId: nextRecipeId,
-        },
-      }),
+    const nextProducts = saveProduct({
+      currentProducts,
+      product: {
+        ...product,
+        id: productId,
+        recipeId: nextRecipeId,
+      },
+    })
+
+    const nextState = {
+      ...currentState,
+      products: nextProducts,
+      technicalSheets: nextTechnicalSheets,
+    }
+
+    return persistMaintenanceState(
+      nextState,
+      `${product.name || 'Produto'} salvo no cardapio e sincronizado com pedidos.`,
+      { activePage: 'produtos' },
     )
   }
 
-  function handleToggleProduct(productId) {
-    setProductsState((currentProducts) => toggleProductStatus(currentProducts, productId))
+  async function handleToggleProduct(productId) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentProducts = currentState.products ?? productsState
+    const product = currentProducts.find((item) => item.id === productId)
+    const nextProducts = toggleProductStatus(currentProducts, productId)
+    const nextProduct = nextProducts.find((item) => item.id === productId)
+
+    return persistMaintenanceState(
+      { ...currentState, products: nextProducts },
+      `${product?.name ?? 'Produto'} ${nextProduct?.active ? 'ativado' : 'inativado'} no cardapio.`,
+      { activePage: 'produtos' },
+    )
   }
 
-  function handleSaveInventoryItem(item) {
-    setInventoryState((currentItems) => saveInventoryItem({ currentItems, item }))
+  async function handleDeleteProduct(productId) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentProducts = currentState.products ?? productsState
+    const currentSheets = currentState.technicalSheets ?? technicalSheetsState
+    const product = currentProducts.find((item) => item.id === productId)
+
+    if (!product) return { ok: false, message: 'Produto nao encontrado.' }
+
+    const nextProducts = currentProducts.filter((item) => item.id !== productId)
+    const nextTechnicalSheets = currentSheets.filter((sheet) => sheet.productId !== productId)
+
+    return persistMaintenanceState(
+      {
+        ...currentState,
+        products: nextProducts,
+        technicalSheets: nextTechnicalSheets,
+      },
+      `${product.name} excluido do cardapio.`,
+      { activePage: 'produtos' },
+    )
+  }
+
+  async function handleSaveInventoryItem(item) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const nextInventory = saveInventoryItem({ currentItems: currentState.inventory ?? inventoryState, item })
+    const nextState = {
+      ...currentState,
+      inventory: nextInventory,
+    }
+
+    return persistMaintenanceState(nextState, `${item.name} salvo no estoque.`)
   }
 
   function handleStockEntry(entry) {
@@ -1941,23 +2505,42 @@ export default function App({ icons, hooks }) {
     ])
   }
 
-  function handleAddIngredient(sheetId, ingredient) {
-    setTechnicalSheetsState((currentSheets) =>
-      currentSheets.map((sheet) => (sheet.id === sheetId ? addIngredientToSheet(sheet, ingredient) : sheet)),
+  async function handleAddIngredient(sheetId, ingredient) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentSheets = currentState.technicalSheets ?? technicalSheetsState
+    const nextSheets = currentSheets.map((sheet) =>
+      sheet.id === sheetId ? addIngredientToSheet(sheet, ingredient) : sheet,
+    )
+
+    return persistMaintenanceState(
+      { ...currentState, technicalSheets: nextSheets },
+      'Ingrediente adicionado na ficha tecnica.',
     )
   }
 
-  function handleRemoveIngredient(sheetId, inventoryItemId) {
-    setTechnicalSheetsState((currentSheets) =>
-      currentSheets.map((sheet) =>
-        sheet.id === sheetId ? removeIngredientFromSheet(sheet, inventoryItemId) : sheet,
-      ),
+  async function handleRemoveIngredient(sheetId, inventoryItemId) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentSheets = currentState.technicalSheets ?? technicalSheetsState
+    const nextSheets = currentSheets.map((sheet) =>
+      sheet.id === sheetId ? removeIngredientFromSheet(sheet, inventoryItemId) : sheet,
+    )
+
+    return persistMaintenanceState(
+      { ...currentState, technicalSheets: nextSheets },
+      'Ingrediente removido da ficha tecnica.',
     )
   }
 
-  function handleUpdateTechnicalSheet(sheetId, details) {
-    setTechnicalSheetsState((currentSheets) =>
-      currentSheets.map((sheet) => (sheet.id === sheetId ? updateTechnicalSheetDetails(sheet, details) : sheet)),
+  async function handleUpdateTechnicalSheet(sheetId, details) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentSheets = currentState.technicalSheets ?? technicalSheetsState
+    const nextSheets = currentSheets.map((sheet) =>
+      sheet.id === sheetId ? updateTechnicalSheetDetails(sheet, details) : sheet,
+    )
+
+    return persistMaintenanceState(
+      { ...currentState, technicalSheets: nextSheets },
+      'Ficha tecnica salva.',
     )
   }
 
@@ -1995,6 +2578,7 @@ export default function App({ icons, hooks }) {
   function handleCreateTableSession(session = {}) {
     const tableNumber = String(session.tableNumber ?? '').trim()
     const customerName = String(session.customerName ?? '').trim()
+    const customerPhone = String(session.customerPhone ?? session.phone ?? '').trim()
     const attendant = String(session.attendant ?? '').trim() || 'Balcao'
 
     if (!tableNumber && !customerName) return null
@@ -2015,6 +2599,7 @@ export default function App({ icons, hooks }) {
     const metadata = {
       tableNumber,
       customerName,
+      customerPhone,
       tableLabel,
       dynamic: !existingTable,
     }
@@ -2047,10 +2632,67 @@ export default function App({ icons, hooks }) {
     return nextTable
   }
 
+  function handleCreateFixedQrTable(tableNumberValue) {
+    const tableNumber = String(tableNumberValue ?? '').trim()
+
+    if (!tableNumber) return { ok: false, message: 'Informe o numero da mesa fixa para gerar o QR Code.' }
+
+    const tableAlreadyExists = tablesState.some((table) => {
+      const mainTab = getTableMainTab(table)
+      const currentNumber = String(table.tableNumber ?? mainTab?.tableNumber ?? '').trim()
+      return currentNumber === tableNumber || String(table.id) === tableNumber
+    })
+
+    if (tableAlreadyExists) return { ok: false, message: `A mesa ${tableNumber} ja existe.` }
+
+    const numericId = Number(tableNumber)
+    const tableId = Number.isInteger(numericId) && numericId > 0 && !tablesState.some((table) => table.id === numericId)
+      ? numericId
+      : Date.now()
+    const tableLabel = `Mesa ${tableNumber}`
+    const metadata = {
+      tableNumber,
+      tableLabel,
+      customerName: '',
+      customerPhone: '',
+      dynamic: false,
+      fixedQr: true,
+    }
+    const newTable = applyTableSessionMetadata({
+      id: tableId,
+      guests: 0,
+      status: 'livre',
+      attendant: '-',
+      total: 0,
+      customerName: '',
+      tableNumber,
+      tableLabel,
+      dynamic: false,
+      fixedQr: true,
+      orderItems: [],
+      tabs: [createMainTableTab(tableId, metadata)],
+    }, metadata)
+
+    setTablesState((currentTables) => normalizeTablesState([...currentTables, newTable]))
+
+    return {
+      ok: true,
+      table: newTable,
+      message: `${tableLabel} criada. O QR Code aponta para /mesa/${tableNumber}.`,
+    }
+  }
+
   function handleAddTableGuest(tableId, guestName) {
+    const guestPayload = typeof guestName === 'object' && guestName !== null
+      ? guestName
+      : { name: guestName, phone: '' }
+    const guestLabel = String(guestPayload.name ?? '').trim()
+    const guestPhone = String(guestPayload.phone ?? '').trim()
     const newTab = {
       id: `${tableId}-${Date.now()}`,
-      name: guestName.trim(),
+      name: guestLabel,
+      customerName: guestLabel,
+      customerPhone: guestPhone,
       orderItems: [],
     }
 
@@ -2079,6 +2721,19 @@ export default function App({ icons, hooks }) {
   }
 
   function resetTableForNewService(table) {
+    const mainTab = getTableMainTab(table)
+    const fixedQr = Boolean(table.fixedQr)
+    const tableNumber = fixedQr ? String(table.tableNumber ?? mainTab?.tableNumber ?? table.id).trim() : ''
+    const tableLabel = fixedQr && tableNumber ? `Mesa ${tableNumber}` : ''
+    const metadata = {
+      tableNumber,
+      tableLabel,
+      customerName: '',
+      customerPhone: '',
+      dynamic: false,
+      fixedQr,
+    }
+
     return {
       ...table,
       status: 'livre',
@@ -2087,16 +2742,36 @@ export default function App({ icons, hooks }) {
       total: 0,
       orderItems: [],
       customerName: '',
-      tableNumber: '',
-      tableLabel: '',
+      customerPhone: '',
+      tableNumber,
+      tableLabel,
       dynamic: false,
-      tabs: [{ id: `${table.id}-mesa`, name: 'Mesa', orderItems: [] }],
+      fixedQr,
+      tabs: [createMainTableTab(table.id, metadata, [])],
     }
   }
 
   function handleRequestTableClose(tableId, options = {}) {
     const table = tablesState.find((currentTable) => currentTable.id === tableId)
     if (!table) return { ok: false, message: 'Mesa nao encontrada.' }
+
+    if (Number(table.total || 0) <= 0) {
+      if (table.status === 'livre') {
+        return { ok: true, message: `${getTableSessionLabel(table)} ja esta livre e sem consumo.` }
+      }
+
+      setTablesState((currentTables) =>
+        currentTables.flatMap((currentTable) => {
+          if (currentTable.id !== tableId) return [currentTable]
+          return currentTable.dynamic ? [] : [resetTableForNewService(currentTable)]
+        }),
+      )
+
+      return {
+        ok: true,
+        message: `${getTableSessionLabel(table)} estava sem consumo e foi liberada sem passar pelo caixa.`,
+      }
+    }
 
     if (options.reset) {
       setTablesState((currentTables) =>
@@ -2119,12 +2794,220 @@ export default function App({ icons, hooks }) {
     return { ok: true, message: `${getTableSessionLabel(table)} enviada para fechamento.` }
   }
 
+  function updateStoredClientQrOrders(updater) {
+    const currentOrders = loadClientQrOrders()
+    const nextOrders = typeof updater === 'function' ? updater(currentOrders) : currentOrders
+    saveClientQrOrders(nextOrders)
+    setClientQrOrdersState(nextOrders)
+    return nextOrders
+  }
+
+  function markClientQrOrder(orderId, patch) {
+    let updatedOrder = null
+    updateStoredClientQrOrders((currentOrders) =>
+      currentOrders.map((order) => {
+        if (order.id !== orderId) return order
+
+        updatedOrder = {
+          ...order,
+          ...(typeof patch === 'function' ? patch(order) : patch),
+        }
+        return updatedOrder
+      }),
+    )
+
+    return updatedOrder
+  }
+
+  function closeClientQrSessionForTable(table) {
+    const mainTab = getTableMainTab(table)
+    const tableNumber = String(table?.tableNumber ?? mainTab?.tableNumber ?? '').trim()
+    if (!tableNumber) return
+
+    const nowIso = new Date().toISOString()
+    clearClientQrSession(tableNumber)
+    updateStoredClientQrOrders((currentOrders) =>
+      currentOrders.map((order) => {
+        if (String(order.tableNumber ?? '').trim() !== tableNumber) return order
+        if (['recusado', 'erro', 'pago', 'fechado'].includes(order.status)) return order
+
+        return {
+          ...order,
+          status: order.type === 'fechamento' ? 'pago' : 'fechado',
+          paidAt: nowIso,
+          adminMessage: 'Comanda paga e mesa liberada. O proximo cliente abre uma nova sessao.',
+        }
+      }),
+    )
+  }
+
+  function findTableForClientQrOrder(order) {
+    const tableNumber = String(order?.tableNumber ?? '').trim()
+    if (!tableNumber) return null
+
+    return tablesState.find((table) => {
+      const mainTab = getTableMainTab(table)
+      const currentNumber = String(table.tableNumber ?? mainTab?.tableNumber ?? table.id).trim()
+      return currentNumber === tableNumber || String(table.id) === tableNumber
+    })
+  }
+
+  function ensureTableForClientQrOrder(order) {
+    const tableNumber = String(order.tableNumber ?? '').trim()
+    const existingTable = findTableForClientQrOrder(order)
+
+    if (existingTable) {
+      if (existingTable.status === 'livre') {
+        handleOpenTable(existingTable.id, {
+          customerName: order.customerName,
+          customerPhone: order.phone,
+          tableNumber,
+          tableLabel: `Mesa ${tableNumber} - ${order.customerName}`,
+        })
+      }
+
+      return existingTable
+    }
+
+    return handleCreateTableSession({
+      tableNumber,
+      customerName: order.customerName,
+      customerPhone: order.phone,
+      attendant: 'QR Code',
+    })
+  }
+
+  async function handleApproveClientQrOrder(orderId, options = {}) {
+    const order = clientQrOrdersState.find((item) => item.id === orderId) ?? loadClientQrOrders().find((item) => item.id === orderId)
+    if (!order) return { ok: false, message: 'Pedido QR nao encontrado.' }
+    if (order.status !== 'novo') return { ok: false, message: 'Este pedido QR ja foi processado.' }
+
+    const table = ensureTableForClientQrOrder(order)
+    if (!table) return { ok: false, message: 'Nao foi possivel localizar ou abrir a mesa do QR.' }
+
+    if (order.type === 'fechamento') {
+      const closeResult = handleRequestTableClose(table.id)
+      if (!closeResult.ok) return closeResult
+
+      markClientQrOrder(orderId, {
+        status: 'aprovado',
+        processedAt: new Date().toISOString(),
+        adminMessage: closeResult.message,
+      })
+
+      return { ok: true, message: `${order.customerName} solicitou fechamento da mesa ${order.tableNumber}.` }
+    }
+
+    const existingClientTab = getTableTabs(table).find((tab) =>
+      String(tab.name).trim().toLowerCase() === String(order.customerName).trim().toLowerCase(),
+    )
+    const clientTab = existingClientTab ?? handleAddTableGuest(table.id, { name: order.customerName, phone: order.phone })
+    const tabId = clientTab?.id ?? `${table.id}-mesa`
+    const tableSnapshot = existingClientTab
+      ? table
+      : {
+          ...table,
+          status: table.status === 'livre' ? 'ocupada' : table.status,
+          guests: (getTableTabs(table).filter((tab) => tab.name !== 'Mesa').length ?? 0) + 1,
+          attendant: table.attendant === '-' ? 'QR Code' : table.attendant,
+          tabs: [...getTableTabs(table), clientTab].filter(Boolean),
+        }
+
+    if (!options.forceStock) {
+      const stockIssue = (order.items ?? [])
+        .map((item) => checkProductStockAvailability({
+          inventoryItems: inventoryState,
+          productId: Number(item.productId),
+          products: productsState,
+          quantity: Number(item.quantity),
+          technicalSheets: technicalSheetsState,
+        }))
+        .find((availability) => !availability.available)
+
+      if (stockIssue) {
+        return {
+          ok: false,
+          needsOverride: true,
+          message: `${stockIssue.message} Se quiser seguir mesmo assim, clique em "Enviar sem estoque".`,
+        }
+      }
+    }
+
+    for (const item of order.items ?? []) {
+      const result = await handleAddTableItem(table.id, Number(item.productId), Number(item.quantity), tabId, item.notes ?? order.notes ?? '', {
+        forceStock: Boolean(options.forceStock),
+        manualNotes: order.notes ?? '',
+        modifiers: item.modifiers ?? null,
+        tableSnapshot,
+        unitPrice: Number(item.unitPrice || 0),
+      })
+
+      if (!result?.ok) {
+        if (!result?.needsOverride) {
+          markClientQrOrder(orderId, {
+            status: 'erro',
+            processedAt: new Date().toISOString(),
+            adminMessage: result?.message ?? 'Nao foi possivel aprovar este pedido.',
+          })
+        }
+        return result
+      }
+    }
+
+    markClientQrOrder(orderId, {
+      status: 'aprovado',
+      processedAt: new Date().toISOString(),
+      adminMessage: `Pedido aprovado e enviado para a cozinha na mesa ${order.tableNumber}.`,
+    })
+
+    return { ok: true, message: `Pedido de ${order.customerName} aprovado e enviado para a cozinha.` }
+  }
+
+  function handleRejectClientQrOrder(orderId) {
+    const updatedOrder = markClientQrOrder(orderId, {
+      status: 'recusado',
+      processedAt: new Date().toISOString(),
+      adminMessage: 'Pedido recusado pelo atendimento.',
+    })
+
+    if (!updatedOrder) return { ok: false, message: 'Pedido QR nao encontrado.' }
+    return { ok: true, message: `Pedido de ${updatedOrder.customerName} recusado.` }
+  }
+
   function handleDeleteTable(tableId) {
     const table = tablesState.find((currentTable) => currentTable.id === tableId)
     if (!table) return { ok: false, message: 'Mesa nao encontrada.' }
     if (tablesState.length <= 1) return { ok: false, message: 'Mantenha ao menos uma mesa cadastrada.' }
 
-    setTablesState((currentTables) => currentTables.filter((currentTable) => currentTable.id !== tableId))
+    const nextTables = normalizeTablesState(tablesState.filter((currentTable) => currentTable.id !== tableId))
+    const nextState = normalizeAppState({
+      ...getCurrentAppState(),
+      tables: nextTables,
+      kitchen: kitchenState,
+    })
+
+    appStateRef.current = nextState
+    setTablesState(nextTables)
+    setSaveStatus('saving')
+
+    const saveJobs = [saveAppState(nextState)]
+    if (currentUser) {
+      saveJobs.push(saveOperationTables({ tables: nextTables, kitchen: kitchenState }))
+    }
+
+    Promise.all(saveJobs)
+      .then((results) => {
+        const failedResult = results.find((result) => result && result.ok === false)
+        setSaveStatus(failedResult ? 'error' : 'saved')
+        if (failedResult) {
+          setAuthMessage({ type: 'error', text: failedResult.message ?? 'Mesa excluida localmente, mas ainda nao sincronizou.' })
+        }
+      })
+      .catch((error) => {
+        setSaveStatus('error')
+        setAuthMessage({ type: 'error', text: error?.message ?? 'Mesa excluida localmente, mas ainda nao sincronizou.' })
+      })
+
     return { ok: true, message: `${getTableSessionLabel(table)} excluida.` }
   }
 
@@ -2138,6 +3021,16 @@ export default function App({ icons, hooks }) {
         technicalSheets: technicalSheetsState,
       }), modifiers ?? { additions: [] }, quantity),
     )
+  }
+
+  function getInventoryAfterProductStockConsumption(baseInventory, productId, quantity, modifiers = null) {
+    return applyModifierStockConsumption(applyProductStockConsumption({
+      inventoryItems: baseInventory,
+      productId,
+      products: productsState,
+      quantity,
+      technicalSheets: technicalSheetsState,
+    }), modifiers ?? { additions: [] }, quantity)
   }
 
   function findEditableKitchenTicketForTableItem(item, tableId, kitchenOrders = kitchenState) {
@@ -2177,7 +3070,7 @@ export default function App({ icons, hooks }) {
       : [{ id: `${table.id}-mesa`, name: 'Mesa', orderItems: table.orderItems ?? [] }]
   }
 
-  function createKitchenTicket({ kitchenTicketId = null, modifiers = null, notes = '', orderItemId = null, source, productId, quantity }) {
+  function buildKitchenTicket({ kitchenTicketId = null, modifiers = null, notes = '', orderItemId = null, source, productId, quantity }) {
     const product = productsState.find((item) => item.id === productId)
     const sheet = technicalSheetsState.find((item) => item.id === product?.recipeId)
 
@@ -2185,41 +3078,54 @@ export default function App({ icons, hooks }) {
 
     const ticketId = kitchenTicketId ?? `#P-${Date.now()}-${productId}`
 
-    setKitchenState((currentQueue) => [
-      {
-        id: ticketId,
-        source,
-        item: `${quantity}x ${product.name}`,
-        orderItemId,
-        modifiers,
-        notes,
-        status: 'em preparo',
-        priority: quantity > 2 ? 'alta' : 'normal',
-        createdAt: Date.now(),
-        startedAt: Date.now(),
-        finalizedAt: null,
-        completedAt: null,
-        deliveredAt: null,
-        targetMinutes: sheet.prepTime,
-      },
-      ...currentQueue,
-    ])
-
-    return ticketId
+    return {
+      id: ticketId,
+      source,
+      item: `${quantity}x ${product.name}`,
+      orderItemId,
+      modifiers,
+      notes,
+      status: 'em preparo',
+      priority: quantity > 2 ? 'alta' : 'normal',
+      createdAt: Date.now(),
+      startedAt: Date.now(),
+      finalizedAt: null,
+      completedAt: null,
+      deliveredAt: null,
+      targetMinutes: sheet.prepTime,
+    }
   }
 
-  function handleAddTableItem(tableId, productId, quantity, tabId = null, notes = '', options = {}) {
-    const product = productsState.find((item) => item.id === productId)
-    const sheet = technicalSheetsState.find((item) => item.id === product?.recipeId)
+  function createKitchenTicket(ticketPayload) {
+    const ticket = buildKitchenTicket(ticketPayload)
+
+    if (!ticket) return null
+
+    setKitchenState((currentQueue) => [ticket, ...currentQueue])
+
+    return ticket.id
+  }
+
+  async function handleAddTableItem(tableId, productId, quantity, tabId = null, notes = '', options = {}) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentTables = currentState.tables ?? tablesState
+    const currentInventory = currentState.inventory ?? inventoryState
+    const currentKitchen = currentState.kitchen ?? kitchenState
+    const currentProducts = currentState.products ?? productsState
+    const currentTechnicalSheets = currentState.technicalSheets ?? technicalSheetsState
+    const product = currentProducts.find((item) => item.id === productId)
+    const sheet = currentTechnicalSheets.find((item) => item.id === product?.recipeId)
+    const tableFromState = currentTables.find((item) => item.id === tableId)
+    const table = tableFromState ?? options.tableSnapshot
     const stockAvailability = checkProductStockAvailability({
-      inventoryItems: inventoryState,
+      inventoryItems: currentInventory,
       productId,
-      products: productsState,
+      products: currentProducts,
       quantity,
-      technicalSheets: technicalSheetsState,
+      technicalSheets: currentTechnicalSheets,
     })
 
-    if (!product || !sheet || quantity <= 0) return { ok: false, message: 'Nao foi possivel lancar este item.' }
+    if (!product || !sheet || !table || quantity <= 0) return { ok: false, message: 'Nao foi possivel lancar este item.' }
     if (!stockAvailability.available && !options.forceStock) {
       return { ok: false, needsOverride: true, message: stockAvailability.message }
     }
@@ -2240,35 +3146,8 @@ export default function App({ icons, hooks }) {
       notes: notes.trim(),
       modifiers: options.modifiers ?? null,
     }
-
-    setTablesState((currentTables) =>
-      currentTables.map((table) =>
-        table.id === tableId
-          ? (() => {
-              const tableTabs = getTableTabs(table)
-              const targetTab = tableTabs.find((tab) => tab.id === tabId) ?? tableTabs[0]
-              const itemWithTab = { ...orderItem, tabId: targetTab.id, tabName: targetTab.name }
-
-              return {
-              ...table,
-              status: table.status === 'livre' ? 'ocupada' : table.status,
-              guests: table.guests || 1,
-              attendant: table.attendant === '-' ? 'Balcao' : table.attendant,
-              total: table.total + itemWithTab.total,
-              orderItems: [...table.orderItems, itemWithTab],
-              tabs: tableTabs.map((tab) =>
-                tab.id === targetTab.id ? { ...tab, orderItems: [...(tab.orderItems ?? []), itemWithTab] } : tab,
-              ),
-            }
-            })()
-          : table,
-      ),
-    )
-
-    consumeProductStock(productId, quantity, options.modifiers)
-    const tableSource = getTableSessionLabel(tablesState.find((table) => table.id === tableId) ?? { id: tableId })
-
-    createKitchenTicket({
+    const tableSource = getTableSessionLabel(table)
+    const ticket = buildKitchenTicket({
       kitchenTicketId,
       modifiers: options.modifiers,
       notes: options.manualNotes ?? orderItem.notes,
@@ -2277,12 +3156,111 @@ export default function App({ icons, hooks }) {
       productId,
       quantity,
     })
-    return {
-      ok: true,
-      message: options.forceStock
-        ? 'Item lancado com alerta de estoque. Corrigir saldo antes das proximas vendas.'
-        : 'Item lancado e enviado para a cozinha.',
+
+    if (!ticket) return { ok: false, message: 'Nao foi possivel criar o ticket da cozinha.' }
+
+    const baseTables = tableFromState ? currentTables : normalizeTablesState([...currentTables, table])
+    const nextTables = baseTables.map((currentTable) =>
+      currentTable.id === tableId
+        ? (() => {
+            const tableTabs = getTableTabs(currentTable)
+            const targetTab = tableTabs.find((tab) => tab.id === tabId) ?? tableTabs[0]
+            const itemWithTab = { ...orderItem, tabId: targetTab.id, tabName: targetTab.name }
+
+            return {
+              ...currentTable,
+              status: currentTable.status === 'livre' ? 'ocupada' : currentTable.status,
+              guests: currentTable.guests || 1,
+              attendant: currentTable.attendant === '-' ? 'Balcao' : currentTable.attendant,
+              total: Number(currentTable.total || 0) + itemWithTab.total,
+              orderItems: [...(currentTable.orderItems ?? []), itemWithTab],
+              tabs: tableTabs.map((tab) =>
+                tab.id === targetTab.id ? { ...tab, orderItems: [...(tab.orderItems ?? []), itemWithTab] } : tab,
+              ),
+            }
+          })()
+        : currentTable,
+    )
+    const nextInventory = getInventoryAfterProductStockConsumption(currentInventory, productId, quantity, options.modifiers)
+    const nextKitchen = [ticket, ...currentKitchen]
+    const nextState = {
+      ...currentState,
+      inventory: nextInventory,
+      tables: nextTables,
+      kitchen: nextKitchen,
     }
+    const successMessage = options.forceStock
+      ? 'Item lancado com alerta de estoque. Mesa, cozinha e estoque foram atualizados.'
+      : 'Item lancado e enviado para a cozinha. Mesa, cozinha e estoque foram atualizados.'
+
+    const result = await persistCheckoutState(nextState, successMessage)
+    return result.ok ? { ok: true, message: successMessage } : result
+  }
+
+  async function handleQuickSale(sale = {}) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentProducts = currentState.products ?? productsState
+    const currentInventory = currentState.inventory ?? inventoryState
+    const currentTechnicalSheets = currentState.technicalSheets ?? technicalSheetsState
+    const currentPayments = currentState.payments ?? paymentsState
+    const productId = Number(sale.productId)
+    const quantity = Number(sale.quantity || 1)
+    const product = currentProducts.find((item) => item.id === productId)
+
+    if (!product || !Number.isFinite(quantity) || quantity <= 0) {
+      return { ok: false, message: 'Escolha um produto e uma quantidade valida para a venda rapida.' }
+    }
+
+    const unitPrice = Number(sale.unitPrice ?? product.price)
+    const total = unitPrice * quantity
+    const now = new Date()
+    const saleId = `VR-${Date.now()}-${productId}`
+    const paymentMethod = sale.paymentMethod || 'pix'
+    const quickSaleItem = {
+      id: `${saleId}-item`,
+      productId,
+      name: product.name,
+      quantity,
+      unitPrice,
+      total,
+      notes: sale.notes ?? '',
+    }
+
+    const paymentRecord = {
+      id: saleId,
+      source: 'venda-rapida',
+      customerName: sale.customerName || 'Balcao',
+      method: paymentMethod,
+      amount: total,
+      grossAmount: total,
+      netAmount: total,
+      discount: 0,
+      serviceCharge: 0,
+      receivedAmount: total,
+      change: 0,
+      time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      paidAt: now.toLocaleDateString('pt-BR'),
+      paidAtIso: now.toISOString(),
+      items: [quickSaleItem],
+    }
+    const nextInventory = applyModifierStockConsumption(applyProductStockConsumption({
+      inventoryItems: currentInventory,
+      productId,
+      products: currentProducts,
+      quantity,
+      technicalSheets: currentTechnicalSheets,
+    }), { additions: [] }, quantity)
+    const nextPayments = [paymentRecord, ...currentPayments]
+    const nextState = {
+      ...currentState,
+      inventory: nextInventory,
+      payments: nextPayments,
+    }
+
+    return persistCheckoutState(
+      nextState,
+      `Venda rapida registrada: ${quantity}x ${product.name} (${appCurrency.format(total)}). Estoque, caixa e financeiro atualizados.`,
+    )
   }
 
   function handleRemoveTableItem(tableId, itemId) {
@@ -2432,8 +3410,13 @@ export default function App({ icons, hooks }) {
     )
   }
 
-  function handleCloseTablePayment(tableId, paymentMethod, tabId = 'all', options = {}) {
-    const table = tablesState.find((item) => item.id === tableId)
+  async function handleCloseTablePayment(tableId, paymentMethod, tabId = 'all', options = {}) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentTables = currentState.tables ?? tablesState
+    const currentPayments = currentState.payments ?? paymentsState
+    const currentCustomers = currentState.customers ?? customersState
+    const currentReceivables = currentState.accountsReceivable ?? accountsReceivableState
+    const table = currentTables.find((item) => item.id === tableId)
     if (!table || table.total <= 0) {
       return { ok: false, message: 'Mesa sem saldo para fechar.' }
     }
@@ -2467,7 +3450,7 @@ export default function App({ icons, hooks }) {
     }
 
     const missingNotebookCustomer = paymentParts.some((payment) =>
-      payment.method === 'caderneta' && !customersState.some((customer) => customer.id === Number(payment.customerId)),
+      payment.method === 'caderneta' && !currentCustomers.some((customer) => customer.id === Number(payment.customerId)),
     )
 
     if (missingNotebookCustomer) {
@@ -2481,10 +3464,11 @@ export default function App({ icons, hooks }) {
     const paidItemIds = new Set(paidItems.map((paidItem) => paidItem.id))
     const nextPaymentRecords = paymentParts.map((payment, index) => {
       const isNotebook = payment.method === 'caderneta'
-      const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
+      const notebookCustomer = currentCustomers.find((customer) => customer.id === Number(payment.customerId))
 
       return {
         id: `${paymentTimestamp}-${tableId}-${tabId}-${index}`,
+        source: 'mesa',
         tableId,
         tabId,
         tabName: tabId === 'all' ? 'Mesa inteira' : selectedTab?.name,
@@ -2496,8 +3480,8 @@ export default function App({ icons, hooks }) {
         customerName: notebookCustomer?.name ?? null,
         discount: index === paidItemsIndex ? discount : 0,
         serviceCharge: index === paidItemsIndex ? serviceCharge : 0,
-        receivedAmount: isNotebook ? 0 : Number(payment.amount),
-        change: 0,
+        receivedAmount: isNotebook ? 0 : Number(options.receivedAmount || payment.amount),
+        change: payment.method === 'dinheiro' ? Math.max(0, Number(options.receivedAmount || payment.amount) - Number(payment.amount)) : 0,
         time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         paidAt: now.toLocaleDateString('pt-BR'),
         paidAtIso: now.toISOString(),
@@ -2507,11 +3491,11 @@ export default function App({ icons, hooks }) {
     const nextReceivableRecords = paymentParts
       .filter((payment) => payment.method === 'caderneta')
       .map((payment, index) => {
-        const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
+        const notebookCustomer = currentCustomers.find((customer) => customer.id === Number(payment.customerId))
 
         return {
           id: `${paymentTimestamp}-${payment.customerId}-${index}`,
-          code: `CR-${String(accountsReceivableState.length + index + 1).padStart(4, '0')}`,
+          code: `CR-${String(currentReceivables.length + index + 1).padStart(4, '0')}`,
           customerId: notebookCustomer.id,
           customerName: notebookCustomer.name,
           description: `Caderneta ${getTableSessionLabel(table)}${tabId === 'all' ? '' : ` - ${selectedTab?.name ?? ''}`}`,
@@ -2521,7 +3505,7 @@ export default function App({ icons, hooks }) {
           serviceCharge: 0,
           status: 'aberto',
           createdAt: now.toLocaleDateString('pt-BR'),
-          createdAtIso: now.toISOString().slice(0, 10),
+          createdAtIso: getLocalDateKey(now),
           dueDate: now.toLocaleDateString('pt-BR'),
           time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           tableId,
@@ -2529,27 +3513,15 @@ export default function App({ icons, hooks }) {
           items: paidItems,
         }
       })
-    const nextPayments = [...nextPaymentRecords, ...paymentsState]
-    const nextReceivables = [...nextReceivableRecords, ...accountsReceivableState]
-    const nextTables = tablesState.flatMap((item) => {
+    const nextPayments = [...nextPaymentRecords, ...currentPayments]
+    const nextReceivables = [...nextReceivableRecords, ...currentReceivables]
+    const nextTables = currentTables.flatMap((item) => {
       if (item.id !== tableId) return [item]
 
       if (tabId === 'all') {
         if (item.dynamic) return []
 
-        return [{
-          ...item,
-          status: 'livre',
-          guests: 0,
-          attendant: '-',
-          total: 0,
-          orderItems: [],
-          customerName: '',
-          tableNumber: '',
-          tableLabel: '',
-          dynamic: false,
-          tabs: [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: [] }],
-        }]
+        return [resetTableForNewService(item)]
       }
 
       const itemTabs = item.tabs?.length
@@ -2566,19 +3538,7 @@ export default function App({ icons, hooks }) {
       const nextTotal = remainingItems.reduce((total, orderItem) => total + Number(orderItem.total || 0), 0)
 
       if (nextTotal <= 0) {
-        return [{
-          ...item,
-          status: 'livre',
-          guests: 0,
-          attendant: '-',
-          total: 0,
-          orderItems: [],
-          customerName: '',
-          tableNumber: '',
-          tableLabel: '',
-          dynamic: false,
-          tabs: [{ id: `${item.id}-mesa`, name: 'Mesa', orderItems: [] }],
-        }]
+        return item.dynamic ? [] : [resetTableForNewService(item)]
       }
 
       return [{
@@ -2591,22 +3551,33 @@ export default function App({ icons, hooks }) {
       }]
     })
     const nextState = {
-      ...getCurrentAppState(),
+      ...currentState,
       tables: nextTables,
       payments: nextPayments,
       accountsReceivable: nextReceivables,
     }
     const successMessage = `${getTableSessionLabel(table)} fechada e zerada no caixa.`
 
-    void persistCheckoutState(nextState, successMessage)
+    const result = await persistCheckoutState(nextState, successMessage)
+    if (result.ok) {
+      closeClientQrSessionForTable(table)
+    }
 
-    return { ok: true, message: successMessage }
+    return result
   }
 
-  function handleCloseDeliveryPayment(deliveryId, paymentMethod, options = {}) {
-    const deliveryOrder = deliveryState.find((order) => order.id === deliveryId)
+  async function handleCloseDeliveryPayment(deliveryId, paymentMethod, options = {}) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentDeliveries = currentState.deliveries ?? deliveryState
+    const currentPayments = currentState.payments ?? paymentsState
+    const currentCustomers = currentState.customers ?? customersState
+    const currentReceivables = currentState.accountsReceivable ?? accountsReceivableState
+    const deliveryOrder = currentDeliveries.find((order) => order.id === deliveryId)
     if (!deliveryOrder || Number(deliveryOrder.total || 0) <= 0) {
       return { ok: false, message: 'Delivery sem saldo para fechar.' }
+    }
+    if (deliveryOrder.paymentStatus === 'pago' || currentPayments.some((payment) => payment.source === 'delivery' && payment.deliveryId === deliveryId)) {
+      return { ok: false, message: `Delivery ${deliveryId} ja foi pago e nao precisa voltar ao caixa.` }
     }
 
     const paidItems = deliveryOrder.items ?? []
@@ -2624,7 +3595,7 @@ export default function App({ icons, hooks }) {
     }
 
     const missingNotebookCustomer = paymentParts.some((payment) =>
-      payment.method === 'caderneta' && !customersState.some((customer) => customer.id === Number(payment.customerId)),
+      payment.method === 'caderneta' && !currentCustomers.some((customer) => customer.id === Number(payment.customerId)),
     )
 
     if (missingNotebookCustomer) {
@@ -2637,7 +3608,7 @@ export default function App({ icons, hooks }) {
     const paymentTimestamp = now.getTime()
     const nextPaymentRecords = paymentParts.map((payment, index) => {
       const isNotebook = payment.method === 'caderneta'
-      const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
+      const notebookCustomer = currentCustomers.find((customer) => customer.id === Number(payment.customerId))
 
       return {
         id: `${paymentTimestamp}-${deliveryId}-${index}`,
@@ -2645,14 +3616,16 @@ export default function App({ icons, hooks }) {
         deliveryId,
         customerId: notebookCustomer?.id ?? deliveryOrder.customerId ?? null,
         customerName: notebookCustomer?.name ?? deliveryOrder.customer ?? null,
+        customerPhone: deliveryOrder.phone ?? '',
+        customerAddress: deliveryOrder.address ?? '',
         method: payment.method,
         amount: isNotebook ? 0 : Number(payment.amount),
         grossAmount: index === paidItemsIndex ? paidAmount : 0,
         netAmount: Number(payment.amount),
         discount: index === paidItemsIndex ? discount : 0,
         serviceCharge: index === paidItemsIndex ? serviceCharge : 0,
-        receivedAmount: isNotebook ? 0 : Number(payment.amount),
-        change: 0,
+        receivedAmount: isNotebook ? 0 : Number(options.receivedAmount || payment.amount),
+        change: payment.method === 'dinheiro' ? Math.max(0, Number(options.receivedAmount || payment.amount) - Number(payment.amount)) : 0,
         time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
         paidAt: now.toLocaleDateString('pt-BR'),
         paidAtIso: now.toISOString(),
@@ -2662,11 +3635,11 @@ export default function App({ icons, hooks }) {
     const nextReceivableRecords = paymentParts
       .filter((payment) => payment.method === 'caderneta')
       .map((payment, index) => {
-        const notebookCustomer = customersState.find((customer) => customer.id === Number(payment.customerId))
+        const notebookCustomer = currentCustomers.find((customer) => customer.id === Number(payment.customerId))
 
         return {
           id: `${paymentTimestamp}-${payment.customerId}-${index}`,
-          code: `CR-${String(accountsReceivableState.length + index + 1).padStart(4, '0')}`,
+          code: `CR-${String(currentReceivables.length + index + 1).padStart(4, '0')}`,
           customerId: notebookCustomer.id,
           customerName: notebookCustomer.name,
           description: `Caderneta Delivery ${deliveryId}`,
@@ -2676,16 +3649,16 @@ export default function App({ icons, hooks }) {
           serviceCharge: 0,
           status: 'aberto',
           createdAt: now.toLocaleDateString('pt-BR'),
-          createdAtIso: now.toISOString().slice(0, 10),
+          createdAtIso: getLocalDateKey(now),
           dueDate: now.toLocaleDateString('pt-BR'),
           time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
           deliveryId,
           items: paidItems,
         }
       })
-    const nextPayments = [...nextPaymentRecords, ...paymentsState]
-    const nextReceivables = [...nextReceivableRecords, ...accountsReceivableState]
-    const nextDeliveries = deliveryState.map((order) =>
+    const nextPayments = [...nextPaymentRecords, ...currentPayments]
+    const nextReceivables = [...nextReceivableRecords, ...currentReceivables]
+    const nextDeliveries = currentDeliveries.map((order) =>
         order.id === deliveryId
           ? {
               ...order,
@@ -2696,16 +3669,26 @@ export default function App({ icons, hooks }) {
           : order,
       )
     const nextState = {
-      ...getCurrentAppState(),
+      ...currentState,
       deliveries: nextDeliveries,
       payments: nextPayments,
       accountsReceivable: nextReceivables,
     }
     const successMessage = `Delivery ${deliveryId} pago e atualizado no caixa.`
 
-    void persistCheckoutState(nextState, successMessage)
+    const result = await persistCheckoutState(nextState, successMessage)
+    if (result.ok) {
+      const linkedClientOrder = findLinkedClientDeliveryOrder(deliveryOrder, loadClientDeliveryOrders())
+      if (linkedClientOrder) {
+        markClientDeliveryOrder(linkedClientOrder.id, {
+          paymentStatus: 'pago',
+          paidAt: now.toISOString(),
+          adminMessage: 'Pagamento confirmado pela loja. Pedido atualizado no caixa.',
+        })
+      }
+    }
 
-    return { ok: true, message: successMessage }
+    return result
   }
 
   function handleAddExpense(expense) {
@@ -2738,7 +3721,7 @@ export default function App({ icons, hooks }) {
     const now = new Date()
     const paymentId = `${Date.now()}-${receivableId}`
     const paidAt = now.toLocaleDateString('pt-BR')
-    const paidAtIso = now.toISOString().slice(0, 10)
+    const paidAtIso = getLocalDateKey(now)
     const paidTime = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
     setPaymentsState((currentPayments) => [
@@ -2786,22 +3769,22 @@ export default function App({ icons, hooks }) {
     return { ok: true }
   }
 
-  function handleCloseCashierShift(closing) {
+  async function handleCloseCashierShift(closing) {
     const now = new Date()
+    const closingRecord = {
+      id: Date.now(),
+      code: `FC-${String(cashClosingsState.length + 1).padStart(4, '0')}`,
+      ...closing,
+      createdAt: now.toLocaleDateString('pt-BR'),
+      createdAtIso: getLocalDateKey(now),
+      time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    }
+    const nextState = {
+      ...getCurrentAppState(),
+      cashClosings: [closingRecord, ...cashClosingsState],
+    }
 
-    setCashClosingsState((currentClosings) => [
-      {
-        id: Date.now(),
-        code: `FC-${String(currentClosings.length + 1).padStart(4, '0')}`,
-        ...closing,
-        createdAt: now.toLocaleDateString('pt-BR'),
-        createdAtIso: now.toISOString().slice(0, 10),
-        time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      },
-      ...currentClosings,
-    ])
-
-    return { ok: true }
+    return persistCheckoutState(nextState, 'Fechamento registrado no historico do caixa.')
   }
 
   function handleAddDeliveryCustomer(customer) {
@@ -2832,18 +3815,25 @@ export default function App({ icons, hooks }) {
     return newCampaign
   }
 
-  function handleCreateDeliveryOrder(order, options = {}) {
-    const newOrder = createDeliveryOrder({ order, customers: customersState, deliveries: deliveryState, products: productsState })
+  async function handleCreateDeliveryOrder(order, options = {}) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentInventory = currentState.inventory ?? inventoryState
+    const currentKitchen = currentState.kitchen ?? kitchenState
+    const currentDeliveries = currentState.deliveries ?? deliveryState
+    const currentCustomers = currentState.customers ?? customersState
+    const currentProducts = currentState.products ?? productsState
+    const currentTechnicalSheets = currentState.technicalSheets ?? technicalSheetsState
+    const newOrder = createDeliveryOrder({ order, customers: currentCustomers, deliveries: currentDeliveries, products: currentProducts })
 
     if (!newOrder || !newOrder.items?.length) return { ok: false, message: 'Nao foi possivel criar o pedido.' }
 
     const stockIssue = newOrder.items
       .map((item) => checkProductStockAvailability({
-        inventoryItems: inventoryState,
+        inventoryItems: currentInventory,
         productId: item.productId,
-        products: productsState,
+        products: currentProducts,
         quantity: item.quantity,
-        technicalSheets: technicalSheetsState,
+        technicalSheets: currentTechnicalSheets,
       }))
       .find((availability) => !availability.available)
 
@@ -2851,29 +3841,314 @@ export default function App({ icons, hooks }) {
       return { ok: false, needsOverride: true, message: stockIssue.message }
     }
 
-    setDeliveryState((currentOrders) => [newOrder, ...currentOrders])
-    newOrder.items.forEach((item) => {
-      consumeProductStock(item.productId, item.quantity, item.modifiers)
-      createKitchenTicket({
+    const nextInventory = newOrder.items.reduce(
+      (currentInventory, item) =>
+        getInventoryAfterProductStockConsumption(currentInventory, item.productId, item.quantity, item.modifiers),
+      currentInventory,
+    )
+    const newKitchenTickets = newOrder.items
+      .map((item) => buildKitchenTicket({
         modifiers: item.modifiers,
         notes: item.manualNotes ?? item.notes,
-        source: `Delivery ${newOrder.id}`,
+        source: `Delivery ${newOrder.id}${newOrder.customer ? ` - ${newOrder.customer}` : ''}`,
         productId: item.productId,
         quantity: item.quantity,
-      })
+      }))
+      .filter(Boolean)
+    const nextState = {
+      ...currentState,
+      inventory: nextInventory,
+      deliveries: [newOrder, ...currentDeliveries],
+      kitchen: [...newKitchenTickets, ...currentKitchen],
+    }
+    const successMessage = options.forceStock
+      ? 'Pedido criado com alerta de estoque. Delivery, cozinha e estoque foram atualizados.'
+      : 'Pedido criado e enviado para a cozinha. Delivery, cozinha e estoque foram atualizados.'
+    const result = await persistCheckoutState(nextState, successMessage)
+
+    return result.ok ? { ok: true, message: successMessage } : result
+  }
+
+  function markClientDeliveryOrder(orderId, patch) {
+    const updatedOrder = updateClientDeliveryOrder(orderId, patch)
+    setClientDeliveryOrdersState(loadClientDeliveryOrders())
+    return updatedOrder
+  }
+
+  function findCustomerByPhone(phone, sourceCustomers = customersState) {
+    const normalizedPhone = String(phone ?? '').replace(/\D/g, '')
+    if (normalizedPhone.length < 8) return null
+
+    return sourceCustomers.find((customer) => {
+      const customerPhone = String(customer.phone ?? '').replace(/\D/g, '')
+      if (customerPhone.length < 8) return false
+      return customerPhone.endsWith(normalizedPhone.slice(-8))
     })
+  }
+
+  async function handleApproveClientDeliveryOrder(orderId, options = {}) {
+    const clientOrder = clientDeliveryOrdersState.find((order) => order.id === orderId) ??
+      loadClientDeliveryOrders().find((order) => order.id === orderId)
+
+    if (!clientOrder) return { ok: false, message: 'Pedido delivery do site nao encontrado.' }
+    if (clientOrder.status !== 'novo') return { ok: false, message: 'Este pedido delivery ja foi processado.' }
+
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentInventory = currentState.inventory ?? inventoryState
+    const currentKitchen = currentState.kitchen ?? kitchenState
+    const currentDeliveries = currentState.deliveries ?? deliveryState
+    const currentCustomers = currentState.customers ?? customersState
+    const currentProducts = currentState.products ?? productsState
+    const currentTechnicalSheets = currentState.technicalSheets ?? technicalSheetsState
+    const isGuestDeliveryOrder = clientOrder.accountType === 'guest'
+    const existingCustomer = isGuestDeliveryOrder ? null : findCustomerByPhone(clientOrder.phone, currentCustomers)
+    const deliveryCustomer = existingCustomer ?? createDeliveryCustomer({
+      name: clientOrder.customerName,
+      email: clientOrder.customerEmail ?? '',
+      phone: clientOrder.phone,
+      address: clientOrder.address,
+      notes: [
+        isGuestDeliveryOrder ? 'Pedido convidado do delivery online.' : 'Cliente criado pelo delivery online.',
+        clientOrder.complement ? `Complemento: ${clientOrder.complement}` : '',
+      ].filter(Boolean).join(' '),
+      tags: isGuestDeliveryOrder ? ['Convidado'] : ['Novo', 'Conta delivery'],
+    })
+    const nextCustomers = existingCustomer || isGuestDeliveryOrder ? currentCustomers : [deliveryCustomer, ...currentCustomers]
+    const orderCustomers = existingCustomer ? currentCustomers : [deliveryCustomer, ...currentCustomers]
+    const deliveryOrder = createDeliveryOrder({
+      order: {
+        customerId: deliveryCustomer.id,
+        channel: 'Site Delivery',
+        campaign: 'Sem campanha',
+        discount: 0,
+        deliveryFee: Number(clientOrder.deliveryFee || 0),
+        paymentMethod: clientOrder.paymentMethod,
+        paymentStatus: clientOrder.paymentStatus,
+        paymentLabel: clientOrder.paymentLabel,
+        payOnDelivery: clientOrder.payOnDelivery,
+        cashChangeFor: clientOrder.cashChangeFor,
+        clientDeliveryOrderId: clientOrder.id,
+        notes: clientOrder.notes,
+        items: clientOrder.items ?? [],
+      },
+      customers: orderCustomers,
+      deliveries: currentDeliveries,
+      products: currentProducts,
+    })
+
+    if (!deliveryOrder || !deliveryOrder.items?.length) {
+      return { ok: false, message: 'Nao foi possivel montar este pedido delivery.' }
+    }
+
+    const stockIssue = deliveryOrder.items
+      .map((item) => checkProductStockAvailability({
+        inventoryItems: currentInventory,
+        productId: item.productId,
+        products: currentProducts,
+        quantity: item.quantity,
+        technicalSheets: currentTechnicalSheets,
+      }))
+      .find((availability) => !availability.available)
+
+    if (stockIssue && !options.forceStock) {
+      return {
+        ok: false,
+        needsOverride: true,
+        message: `${stockIssue.message} Se quiser seguir mesmo assim, aprove sem estoque.`,
+      }
+    }
+
+    const nextInventory = deliveryOrder.items.reduce(
+      (currentInventory, item) =>
+        getInventoryAfterProductStockConsumption(currentInventory, item.productId, item.quantity, item.modifiers),
+      currentInventory,
+    )
+    const newKitchenTickets = deliveryOrder.items
+      .map((item) => buildKitchenTicket({
+        modifiers: item.modifiers,
+        notes: item.manualNotes ?? item.notes ?? clientOrder.notes,
+        source: `Delivery ${deliveryOrder.id}${deliveryOrder.customer ? ` - ${deliveryOrder.customer}` : ''}`,
+        productId: item.productId,
+        quantity: item.quantity,
+      }))
+      .filter(Boolean)
+    const nextState = {
+      ...currentState,
+      customers: nextCustomers,
+      inventory: nextInventory,
+      deliveries: [deliveryOrder, ...currentDeliveries],
+      kitchen: [...newKitchenTickets, ...currentKitchen],
+    }
+    const successMessage = options.forceStock
+      ? `Pedido ${deliveryOrder.id} aprovado com alerta de estoque.`
+      : `Pedido ${deliveryOrder.id} aprovado e enviado para a cozinha.`
+    const result = await persistCheckoutState(nextState, successMessage)
+
+    if (!result.ok) return result
+
+    markClientDeliveryOrder(orderId, {
+      status: 'aprovado',
+      eta: '35 min',
+      adminDeliveryId: deliveryOrder.id,
+      processedAt: new Date().toISOString(),
+      adminMessage: options.forceStock
+        ? 'A loja aceitou seu pedido com alerta de estoque e vai confirmar os itens.'
+        : 'A loja aceitou seu pedido. Ele ja foi enviado para a cozinha.',
+    })
+
+    return { ok: true, message: successMessage }
+  }
+
+  function handleRejectClientDeliveryOrder(orderId) {
+    const updatedOrder = markClientDeliveryOrder(orderId, {
+      status: 'recusado',
+      processedAt: new Date().toISOString(),
+      adminMessage: 'Pedido recusado pelo atendimento.',
+    })
+
+    if (!updatedOrder) return { ok: false, message: 'Pedido delivery do site nao encontrado.' }
+    return { ok: true, message: `Pedido de ${updatedOrder.customerName} recusado.` }
+  }
+
+  function normalizeDeliveryPaymentMethodForCashier(order) {
+    const method = String(order?.paymentMethod ?? '').replace('_entrega', '')
+    if (['pix', 'credito', 'debito', 'dinheiro'].includes(method)) return method
+    if (method === 'link') return 'pix'
+    return 'dinheiro'
+  }
+
+  function shouldAutoRegisterDeliveryPayment(order, payments = []) {
+    if (!order || order.status === 'entregue') return false
+    if (order.paymentStatus === 'pago') return false
+    if (payments.some((payment) => payment.source === 'delivery' && payment.deliveryId === order.id)) return false
+    if (order.paymentMethod === 'link') return false
+
+    return order.payOnDelivery || order.paymentStatus === 'pagar_na_entrega' || ['pix', 'credito', 'debito', 'dinheiro', 'entrega'].includes(order.paymentMethod)
+  }
+
+  function createDeliveryAutoPaymentRecord(order, now = new Date()) {
+    const method = normalizeDeliveryPaymentMethodForCashier(order)
+    const receivedAmount = method === 'dinheiro' && Number(order.cashChangeFor || 0) > 0
+      ? Number(order.cashChangeFor)
+      : Number(order.total || 0)
+
     return {
-      ok: true,
-      message: options.forceStock
-        ? 'Pedido criado com alerta de estoque. Corrigir saldo antes das proximas vendas.'
-        : 'Pedido criado e enviado para a cozinha.',
+      id: `${now.getTime()}-${order.id}-entrega`,
+      source: 'delivery',
+      deliveryId: order.id,
+      customerId: order.customerId ?? null,
+      customerName: order.customer ?? null,
+      customerPhone: order.phone ?? '',
+      customerAddress: order.address ?? '',
+      method,
+      amount: Number(order.total || 0),
+      grossAmount: Number(order.total || 0),
+      netAmount: Number(order.total || 0),
+      discount: Number(order.discount || 0),
+      serviceCharge: 0,
+      receivedAmount,
+      change: method === 'dinheiro' ? Math.max(0, receivedAmount - Number(order.total || 0)) : 0,
+      time: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      paidAt: now.toLocaleDateString('pt-BR'),
+      paidAtIso: now.toISOString(),
+      items: order.items ?? [],
     }
   }
 
-  function handleAdvanceDeliveryOrder(orderId) {
-    setDeliveryState((currentOrders) =>
-      currentOrders.map((order) => (order.id === orderId ? advanceDeliveryOrder(order) : order)),
+  async function handleAdvanceDeliveryOrder(orderId) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentDeliveries = currentState.deliveries ?? deliveryState
+    const currentPayments = currentState.payments ?? paymentsState
+    const currentOrder = currentDeliveries.find((order) => order.id === orderId)
+    const linkedClientOrder = findLinkedClientDeliveryOrder(currentOrder, loadClientDeliveryOrders())
+    const rawNextOrder = currentOrder ? advanceDeliveryOrder(currentOrder) : null
+    const willRegisterPayment = rawNextOrder?.status === 'entregue' && shouldAutoRegisterDeliveryPayment(currentOrder, currentPayments)
+    const paidAt = willRegisterPayment ? new Date() : null
+    const orderWithPayment = willRegisterPayment
+      ? {
+          ...rawNextOrder,
+          paymentStatus: 'pago',
+          paymentMethod: normalizeDeliveryPaymentMethodForCashier(rawNextOrder),
+          paidAt: paidAt.toISOString(),
+        }
+      : rawNextOrder
+    const nextOrder = orderWithPayment && linkedClientOrder && !orderWithPayment.clientDeliveryOrderId
+      ? { ...orderWithPayment, clientDeliveryOrderId: linkedClientOrder.id }
+      : orderWithPayment
+
+    if (!nextOrder) {
+      return { ok: false, message: 'Pedido delivery nao encontrado.' }
+    }
+
+    const nextDeliveries = currentDeliveries.map((order) => (order.id === orderId ? nextOrder : order))
+    const nextPayments = willRegisterPayment
+      ? [createDeliveryAutoPaymentRecord(nextOrder, paidAt), ...currentPayments]
+      : currentPayments
+    const nextState = {
+      ...currentState,
+      deliveries: nextDeliveries,
+      payments: nextPayments,
+    }
+    const result = await persistCheckoutState(
+      nextState,
+      willRegisterPayment
+        ? `Delivery ${orderId} entregue e creditado no caixa.`
+        : `Delivery ${orderId} atualizado para ${nextOrder.status}.`,
     )
+
+    if (result.ok && nextOrder.clientDeliveryOrderId) {
+      const now = Date.now()
+      markClientDeliveryOrder(nextOrder.clientDeliveryOrderId, getClientDeliveryPatchFromAdminOrder(nextOrder, now))
+    }
+
+    return result
+  }
+
+  async function handleClearDeliveryQueue(options = {}) {
+    const { dateKey = '', status = 'entregue' } = options
+    const shouldRemoveOrder = (order) => {
+      const matchesStatus = status === 'todos' ? true : order.status === status
+      const matchesDate = dateKey ? getLocalDateKey(order.createdAt) === dateKey : true
+      return matchesStatus && matchesDate
+    }
+    const nextDeliveries = deliveryState.filter((order) => !shouldRemoveOrder(order))
+    const removedCount = deliveryState.length - nextDeliveries.length
+
+    if (removedCount <= 0) {
+      return { ok: true, message: 'Nenhum pedido encontrado para limpar.' }
+    }
+
+    const nextState = {
+      ...getCurrentAppState(),
+      deliveries: nextDeliveries,
+    }
+
+    return persistMaintenanceState(
+      nextState,
+      `${removedCount} pedido(s) removido(s) da fila de delivery.`,
+      { skipBackup: true },
+    )
+  }
+
+  function handleClearClientDeliveryHistory(options = {}) {
+    const { dateKey = '' } = options
+    const currentOrders = loadClientDeliveryOrders()
+    const nextOrders = currentOrders.filter((order) => {
+      if (order.status === 'novo') return true
+      if (!dateKey) return false
+      const orderDate = order.createdAt ? getLocalDateKey(new Date(order.createdAt).getTime()) : ''
+      return orderDate !== dateKey
+    })
+    const removedCount = currentOrders.length - nextOrders.length
+    const savedOrders = saveClientDeliveryOrders(nextOrders)
+    setClientDeliveryOrdersState(savedOrders)
+
+    return {
+      ok: true,
+      message: removedCount > 0
+        ? `${removedCount} registro(s) removido(s) do historico do site.`
+        : 'Nenhum historico do site para limpar.',
+    }
   }
 
   async function handleUpdateWhatsAppMessageStatus(messageId, status) {
@@ -2905,16 +4180,22 @@ export default function App({ icons, hooks }) {
     ),
     mesas: (
       <Tables
+        clientQrOrders={clientQrOrdersState}
         onAddTableItem={handleAddTableItem}
         onAddTableGuest={handleAddTableGuest}
+        onApproveClientQrOrder={handleApproveClientQrOrder}
+        onCreateFixedQrTable={handleCreateFixedQrTable}
         onCreateTableSession={handleCreateTableSession}
         onDeleteTable={handleDeleteTable}
         onOpenTable={handleOpenTable}
+        onRejectClientQrOrder={handleRejectClientQrOrder}
         onRemoveTableItem={handleRemoveTableItem}
         onRequestTableClose={handleRequestTableClose}
+        onQuickSale={handleQuickSale}
         onUpdateTableItemQuantity={handleUpdateTableItemQuantity}
         inventoryItems={inventoryState}
         kitchenOrders={kitchenState}
+        payments={paymentsState}
         products={productsState}
         tables={tablesState}
         technicalSheets={technicalSheetsState}
@@ -2922,11 +4203,16 @@ export default function App({ icons, hooks }) {
     ),
     delivery: (
       <Delivery
+        clientDeliveryOrders={clientDeliveryOrdersState}
         customers={customersState}
         deliveries={deliveryState}
         onAddCustomer={handleAddDeliveryCustomer}
         onAdvanceOrder={handleAdvanceDeliveryOrder}
+        onApproveClientDeliveryOrder={handleApproveClientDeliveryOrder}
+        onClearClientDeliveryHistory={handleClearClientDeliveryHistory}
+        onClearDeliveryQueue={handleClearDeliveryQueue}
         onCreateOrder={handleCreateDeliveryOrder}
+        onRejectClientDeliveryOrder={handleRejectClientDeliveryOrder}
         onUpdateWhatsAppMessageStatus={handleUpdateWhatsAppMessageStatus}
         inventoryItems={inventoryState}
         products={productsState}
@@ -2949,6 +4235,7 @@ export default function App({ icons, hooks }) {
       <Products
         inventoryItems={inventoryState}
         onCreateSheet={handleCreateTechnicalSheet}
+        onDeleteProduct={handleDeleteProduct}
         onSaveProduct={handleSaveProduct}
         onToggleProduct={handleToggleProduct}
         products={productsState}
@@ -3077,6 +4364,8 @@ export default function App({ icons, hooks }) {
       onProfileChange={handleProfileChange}
       pageTitle={pageTitle}
       icons={icons}
+      notifications={adminNotificationsState}
+      onClearNotifications={handleClearAdminNotifications}
       onResetData={handleResetData}
       onResetFinancialData={handleResetFinancialData}
       onResetInventoryStock={handleResetInventoryStock}

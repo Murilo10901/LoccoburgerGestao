@@ -1,4 +1,5 @@
 import { Card } from '../components/Card.jsx'
+import { getTodayLocalDateKey } from '../lib/dateUtils.js'
 import { getRecipeUnitCost } from '../lib/technicalSheetRepository.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -32,7 +33,7 @@ export function Dre({ expenses, inventoryItems, payments, products, stockAdjustm
       return itemTotal + getItemCost(item, products, technicalSheets, inventoryItems)
     }, 0)
   }, 0)
-  const todayIsoDate = new Date().toISOString().slice(0, 10)
+  const todayIsoDate = getTodayLocalDateKey()
   const stockLossTotal = stockAdjustments
     .filter((adjustment) => adjustment.type === 'perda' && adjustment.createdAtIso === todayIsoDate)
     .reduce((total, adjustment) => total + Number(adjustment.totalCost || 0), 0)

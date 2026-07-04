@@ -7,6 +7,7 @@ export function saveProduct({ currentProducts, product }) {
     name: product.name.trim(),
     category: product.category.trim(),
     type: product.type.trim(),
+    description: String(product.description ?? '').trim(),
     price: Number(product.price),
     active: product.active ?? true,
     recipeId,

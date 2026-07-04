@@ -160,6 +160,9 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
   const [now, setNow] = useState(Date.now())
   const activeOrders = orders.filter((order) => order.status !== 'finalizado')
   const completedOrders = orders.filter((order) => order.completedAt)
+  const sortedCompletedOrders = [...completedOrders].sort(
+    (first, second) => Number(second.completedAt ?? second.deliveredAt ?? 0) - Number(first.completedAt ?? first.deliveredAt ?? 0),
+  )
   const averageMinutes = completedOrders.length
     ? completedOrders.reduce((total, order) => total + minutesBetween(order.createdAt, order.completedAt), 0) / completedOrders.length
     : 0
@@ -423,11 +426,13 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
           </div>
         </div>
         <div className="list-stack">
-          {completedOrders.slice(0, 6).map((order) => (
+          {sortedCompletedOrders.slice(0, 14).map((order) => (
             <div className="list-row" key={order.id}>
               <div>
                 <strong>{order.item}</strong>
-                <span>{order.source} - {minutesBetween(order.createdAt, order.completedAt)} min de producao</span>
+                <span>
+                  {order.source} - finalizado {new Date(order.completedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {minutesBetween(order.createdAt, order.completedAt)} min de producao
+                </span>
                 <KitchenInstructions compact order={order} />
               </div>
               <StatusBadge status={order.status} />

@@ -100,6 +100,7 @@ export async function saveAppState(state) {
     return { ...result, source: 'local-fallback' }
   }
 
+  saveStoredState(state)
   return { ...result, source: 'supabase' }
 }
 

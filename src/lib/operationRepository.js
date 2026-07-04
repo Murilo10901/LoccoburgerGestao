@@ -1,3 +1,4 @@
+import { getLocalDateKey } from './dateUtils.js'
 import { getRecipeUnitCost } from './technicalSheetRepository.js'
 
 const paymentMethods = ['pix', 'credito', 'debito', 'dinheiro']
@@ -143,7 +144,7 @@ function addDays(date, days) {
 }
 
 function formatIsoDate(date) {
-  return date.toISOString().slice(0, 10)
+  return getLocalDateKey(date)
 }
 
 function formatBusinessDate(date) {

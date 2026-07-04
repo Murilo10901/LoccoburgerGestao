@@ -29,6 +29,8 @@ export function TechnicalSheet({
 }) {
   const [ingredientForms, setIngredientForms] = useState({})
   const [sheetForms, setSheetForms] = useState({})
+  const [savingAction, setSavingAction] = useState(null)
+  const [sheetMessage, setSheetMessage] = useState(null)
   const productsWithoutSheet = products.filter((product) => !product.recipeId)
 
   function getForm(sheet) {
@@ -65,18 +67,36 @@ export function TechnicalSheet({
     }))
   }
 
-  function handleUpdateSheet(event, sheet) {
+  async function handleUpdateSheet(event, sheet) {
     event.preventDefault()
+    if (savingAction) return
 
     const form = getSheetForm(sheet)
-    onUpdateSheet(sheet.id, {
-      prepTime: Number(form.prepTime),
-      yield: Number(form.yield),
-    })
+    setSavingAction(`settings-${sheet.id}`)
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onUpdateSheet(sheet.id, {
+          prepTime: Number(form.prepTime),
+          yield: Number(form.yield),
+        })),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      setSheetMessage({
+        sheetId: sheet.id,
+        ok: result?.ok !== false,
+        text: result?.message ?? 'Ficha tecnica salva.',
+      })
+    } catch (error) {
+      setSheetMessage({ sheetId: sheet.id, ok: false, text: error?.message ?? 'Nao foi possivel salvar a ficha.' })
+    } finally {
+      setSavingAction(null)
+    }
   }
 
-  function handleAddIngredient(event, sheet) {
+  async function handleAddIngredient(event, sheet) {
     event.preventDefault()
+    if (savingAction) return
 
     const form = getForm(sheet)
     const quantity = Number(form.quantity)
@@ -84,14 +104,54 @@ export function TechnicalSheet({
 
     if (!inventoryItemId || quantity <= 0) return
 
-    onAddIngredient(sheet.id, { inventoryItemId, quantity })
-    setIngredientForms((currentForms) => ({
-      ...currentForms,
-      [sheet.id]: {
-        ...form,
-        quantity: '',
-      },
-    }))
+    setSavingAction(`ingredient-${sheet.id}`)
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onAddIngredient(sheet.id, { inventoryItemId, quantity })),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      const ok = result?.ok !== false
+      setSheetMessage({
+        sheetId: sheet.id,
+        ok,
+        text: result?.message ?? 'Ingrediente adicionado na ficha tecnica.',
+      })
+      if (ok) {
+        setIngredientForms((currentForms) => ({
+          ...currentForms,
+          [sheet.id]: {
+            ...form,
+            quantity: '',
+          },
+        }))
+      }
+    } catch (error) {
+      setSheetMessage({ sheetId: sheet.id, ok: false, text: error?.message ?? 'Nao foi possivel adicionar o ingrediente.' })
+    } finally {
+      setSavingAction(null)
+    }
+  }
+
+  async function handleRemoveIngredient(sheet, inventoryItemId) {
+    if (savingAction) return
+    setSavingAction(`remove-${sheet.id}-${inventoryItemId}`)
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onRemoveIngredient(sheet.id, inventoryItemId)),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      setSheetMessage({
+        sheetId: sheet.id,
+        ok: result?.ok !== false,
+        text: result?.message ?? 'Ingrediente removido da ficha tecnica.',
+      })
+    } catch (error) {
+      setSheetMessage({ sheetId: sheet.id, ok: false, text: error?.message ?? 'Nao foi possivel remover o ingrediente.' })
+    } finally {
+      setSavingAction(null)
+    }
   }
 
   return (
@@ -165,6 +225,10 @@ export function TechnicalSheet({
               </div>
             </div>
 
+            {sheetMessage?.sheetId === sheet.id && (
+              <div className={sheetMessage.ok ? 'form-hint' : 'form-alert'}>{sheetMessage.text}</div>
+            )}
+
             <form className="recipe-settings-form" onSubmit={(event) => handleUpdateSheet(event, sheet)}>
               <label>
                 Tempo preparo
@@ -186,7 +250,9 @@ export function TechnicalSheet({
                   onChange={(event) => updateSheetForm(sheet.id, 'yield', event.target.value)}
                 />
               </label>
-              <button className="ghost-button" type="submit">Salvar ficha</button>
+              <button className="ghost-button" disabled={savingAction === `settings-${sheet.id}`} type="submit">
+                {savingAction === `settings-${sheet.id}` ? 'Salvando...' : 'Salvar ficha'}
+              </button>
             </form>
 
             {sheet.yield > 1 && (
@@ -213,10 +279,11 @@ export function TechnicalSheet({
                       <b>{currency.format(ingredientCost)}</b>
                       <button
                         className="ghost-button"
+                        disabled={savingAction === `remove-${sheet.id}-${ingredient.inventoryItemId}`}
                         type="button"
-                        onClick={() => onRemoveIngredient(sheet.id, ingredient.inventoryItemId)}
+                        onClick={() => handleRemoveIngredient(sheet, ingredient.inventoryItemId)}
                       >
-                        Remover
+                        {savingAction === `remove-${sheet.id}-${ingredient.inventoryItemId}` ? 'Removendo...' : 'Remover'}
                       </button>
                     </div>
                   </div>
@@ -258,7 +325,9 @@ export function TechnicalSheet({
                   Custo previsto deste insumo: {currency.format(selectedIngredientItem.averageCost * Number(form.quantity))} para {number.format(Number(form.quantity))} {selectedIngredientItem.unit}.
                 </div>
               )}
-              <button className="secondary-button" type="submit">Adicionar</button>
+              <button className="secondary-button" disabled={savingAction === `ingredient-${sheet.id}`} type="submit">
+                {savingAction === `ingredient-${sheet.id}` ? 'Adicionando...' : 'Adicionar'}
+              </button>
             </form>
           </Card>
         )
