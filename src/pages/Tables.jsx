@@ -119,6 +119,7 @@ export function Tables({
   onDeleteTable,
   onOpenTable,
   onRejectClientQrOrder,
+  onReopenTableClose,
   onRemoveTableItem,
   onRequestTableClose,
   onQuickSale,
@@ -190,7 +191,7 @@ export function Tables({
     [selectedTableId, tables],
   )
 
-  const activeProducts = products.filter((product) => product.active)
+  const activeProducts = products.filter((product) => product.active && (product.availableChannels?.qr ?? true))
   const productCategories = [
     allCategoriesLabel,
     ...Array.from(new Set(activeProducts.map((product) => product.category))).filter(Boolean),
@@ -209,6 +210,7 @@ export function Tables({
     ? selectedTable.tabs
     : [{ id: `${selectedTable?.id ?? 0}-mesa`, name: 'Mesa', orderItems: selectedTable?.orderItems ?? [] }]
   const selectedTab = tableTabs.find((tab) => tab.id === selectedTabId) ?? tableTabs[0]
+  const selectedTabTotal = (selectedTab?.orderItems ?? []).reduce((total, item) => total + Number(item.total || 0), 0)
   const selectedDraftItems = draftItemsByTable[selectedTable?.id] ?? []
   const selectedTableQrNumber = String(selectedTable?.tableNumber ?? selectedTable?.id ?? '').trim()
   const selectedTableQrUrl = selectedTableQrNumber && typeof window !== 'undefined'
@@ -429,8 +431,34 @@ export function Tables({
 
   function handleRequestSelectedTableClose() {
     if (!selectedTable) return
-    const result = onRequestTableClose?.(selectedTable.id)
+    const result = onRequestTableClose?.(selectedTable.id, { tabId: 'all' })
     setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel solicitar fechamento desta mesa.' })
+  }
+
+  function handleReopenSelectedTableClose() {
+    if (!selectedTable) return
+    const result = onReopenTableClose?.(selectedTable.id, { tabId: 'all' })
+    setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel reabrir esta mesa.' })
+  }
+
+  function handleRequestSelectedTabClose() {
+    if (!selectedTable || !selectedTab) return
+
+    const result = onRequestTableClose?.(selectedTable.id, {
+      customerName: selectedTab.customerName ?? selectedTab.name,
+      sessionId: selectedTab.sessionId,
+      tabId: selectedTab.id,
+    })
+    setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel solicitar fechamento desta comanda.' })
+  }
+
+  function handleReopenSelectedTabClose() {
+    if (!selectedTable || !selectedTab) return
+
+    const result = onReopenTableClose?.(selectedTable.id, {
+      tabId: selectedTab.id,
+    })
+    setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel reabrir esta comanda.' })
   }
 
   function handleCreateFixedQrTable(event) {
@@ -740,23 +768,71 @@ export function Tables({
     return !kitchenTicket || kitchenTicket.status !== 'finalizado'
   }
 
-  function handleRemoveSentItem(item) {
-    const result = onRemoveTableItem?.(selectedTable.id, item.id)
+  async function handleRemoveSentItem(item) {
+    if (!window.confirm(`Excluir ${item.quantity}x ${item.name} da comanda? O estoque e a cozinha serao recalculados.`)) return
+
+    setKitchenFeedback({
+      type: 'loading',
+      scope: 'Mesa',
+      title: 'Excluindo item...',
+      message: 'Atualizando comanda, cozinha e estoque.',
+    })
+
+    let result = null
+    try {
+      ;[result] = await Promise.all([
+        Promise.resolve(onRemoveTableItem?.(selectedTable.id, item.id)),
+        new Promise((resolve) => window.setTimeout(resolve, 350)),
+      ])
+    } catch (error) {
+      result = { ok: false, message: error?.message ?? 'Nao foi possivel excluir este item.' }
+    }
+
     setPendingSentOverride(null)
     setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel excluir este item.' })
+    setKitchenFeedback({
+      type: result?.ok ? 'success' : 'error',
+      title: result?.ok ? 'Item excluido' : 'Item nao excluido',
+      message: result?.message ?? 'Nao foi possivel excluir este item.',
+    })
   }
 
-  function handleUpdateSentItemQuantity(item, nextQuantity, forceStock = false) {
-    const result = onUpdateTableItemQuantity?.(selectedTable.id, item.id, nextQuantity, { forceStock })
+  async function handleUpdateSentItemQuantity(item, nextQuantity, forceStock = false) {
+    setKitchenFeedback({
+      type: 'loading',
+      scope: 'Mesa',
+      title: 'Atualizando item...',
+      message: 'Salvando quantidade, cozinha e estoque.',
+    })
+
+    let result = null
+    try {
+      ;[result] = await Promise.all([
+        Promise.resolve(onUpdateTableItemQuantity?.(selectedTable.id, item.id, nextQuantity, { forceStock })),
+        new Promise((resolve) => window.setTimeout(resolve, 350)),
+      ])
+    } catch (error) {
+      result = { ok: false, message: error?.message ?? 'Nao foi possivel alterar este item.' }
+    }
 
     if (!result?.ok) {
       setPendingSentOverride(result?.needsOverride ? { itemId: item.id, nextQuantity } : null)
       setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel alterar este item.' })
+      setKitchenFeedback({
+        type: 'error',
+        title: 'Item nao atualizado',
+        message: result?.message ?? 'Nao foi possivel alterar este item.',
+      })
       return
     }
 
     setPendingSentOverride(null)
     setOrderMessage(result)
+    setKitchenFeedback({
+      type: 'success',
+      title: 'Item atualizado',
+      message: result.message ?? 'Comanda atualizada.',
+    })
   }
 
   function handleForceSentQuantity() {
@@ -1146,12 +1222,15 @@ export function Tables({
           </button>
           <button
             className="ghost-button"
-            disabled={selectedTable.status === 'fechamento' && Number(selectedTable.total || 0) > 0}
             type="button"
-            onClick={handleRequestSelectedTableClose}
+            onClick={
+              selectedTable.status === 'fechamento' && Number(selectedTable.total || 0) > 0
+                ? handleReopenSelectedTableClose
+                : handleRequestSelectedTableClose
+            }
           >
             {selectedTable.status === 'fechamento' && Number(selectedTable.total || 0) > 0
-              ? 'Fechamento solicitado'
+              ? 'Reabrir conta'
               : Number(selectedTable.total || 0) <= 0
                 ? 'Liberar sem consumo'
                 : 'Solicitar fechamento'}
@@ -1180,6 +1259,23 @@ export function Tables({
                 <strong>{currency.format(tab.total)}</strong>
               </button>
             ))}
+          </div>
+          <div className="selected-tab-action-card">
+            <div>
+              <span>Comanda selecionada</span>
+              <strong>{selectedTab?.name ?? 'Mesa'}</strong>
+              <small>{currency.format(selectedTabTotal)} em aberto nesta pessoa/comanda.</small>
+            </div>
+            <button
+              className="ghost-button"
+              disabled={selectedTabTotal <= 0}
+              type="button"
+              onClick={selectedTab?.status === 'fechamento' ? handleReopenSelectedTabClose : handleRequestSelectedTabClose}
+            >
+              {selectedTab?.status === 'fechamento'
+                ? `Reabrir comanda de ${selectedTab?.name ?? 'Mesa'}`
+                : `Fechar comanda de ${selectedTab?.name ?? 'Mesa'}`}
+            </button>
           </div>
           <form className="guest-form" onSubmit={handleAddGuest}>
             <input

@@ -157,12 +157,19 @@ function KitchenInstructions({ compact = false, order }) {
 export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
   const [viewMode, setViewMode] = useState('individual')
   const [sortMode, setSortMode] = useState('fila')
+  const [completedSourceFilter, setCompletedSourceFilter] = useState('todos')
+  const [actionOrderId, setActionOrderId] = useState(null)
+  const [kitchenMessage, setKitchenMessage] = useState(null)
   const [now, setNow] = useState(Date.now())
   const activeOrders = orders.filter((order) => order.status !== 'finalizado')
   const completedOrders = orders.filter((order) => order.completedAt)
   const sortedCompletedOrders = [...completedOrders].sort(
     (first, second) => Number(second.completedAt ?? second.deliveredAt ?? 0) - Number(first.completedAt ?? first.deliveredAt ?? 0),
   )
+  const completedSourceOptions = ['todos', ...Array.from(new Set(sortedCompletedOrders.map((order) => order.source).filter(Boolean)))]
+  const visibleCompletedOrders = completedSourceFilter === 'todos'
+    ? sortedCompletedOrders
+    : sortedCompletedOrders.filter((order) => order.source === completedSourceFilter)
   const averageMinutes = completedOrders.length
     ? completedOrders.reduce((total, order) => total + minutesBetween(order.createdAt, order.completedAt), 0) / completedOrders.length
     : 0
@@ -190,9 +197,67 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
     return () => window.clearInterval(intervalId)
   }, [])
 
-  function handleAdvanceGroup(groupOrders) {
-    groupOrders.forEach((order) => {
-      if (order.status !== 'finalizado') onAdvanceOrder(order.id)
+  useEffect(() => {
+    if (!kitchenMessage || kitchenMessage.type === 'loading') return undefined
+
+    const timer = window.setTimeout(() => setKitchenMessage(null), 3200)
+    return () => window.clearTimeout(timer)
+  }, [kitchenMessage])
+
+  async function runKitchenAction(actionId, loadingText, action) {
+    if (actionOrderId) return
+
+    setActionOrderId(actionId)
+    setKitchenMessage({ type: 'loading', text: loadingText })
+
+    let result = null
+    try {
+      ;[result] = await Promise.all([
+        Promise.resolve(action()),
+        new Promise((resolve) => window.setTimeout(resolve, 350)),
+      ])
+    } catch (error) {
+      result = { ok: false, message: error?.message ?? 'Nao foi possivel atualizar a cozinha.' }
+    }
+
+    setActionOrderId(null)
+    setKitchenMessage({
+      type: result?.ok ? 'success' : 'error',
+      text: result?.message ?? 'Cozinha atualizada.',
+    })
+  }
+
+  function handleAdvanceOrder(order) {
+    runKitchenAction(order.id, `Salvando ${order.item}...`, () => onAdvanceOrder?.(order.id))
+  }
+
+  function handlePrioritizeOrder(order) {
+    runKitchenAction(order.id, `Priorizando ${order.item}...`, () => onPrioritizeOrder?.(order.id))
+  }
+
+  async function handleAdvanceGroup(groupOrders) {
+    const groupId = `group-${groupOrders[0]?.source ?? 'cozinha'}`
+    if (actionOrderId) return
+
+    setActionOrderId(groupId)
+    setKitchenMessage({ type: 'loading', text: `Finalizando ${groupOrders.length} item(ns) do grupo...` })
+
+    let lastResult = null
+    try {
+      for (const order of groupOrders) {
+        if (order.status !== 'finalizado') {
+          lastResult = await Promise.resolve(onAdvanceOrder?.(order.id))
+          if (lastResult && lastResult.ok === false) break
+        }
+      }
+    } catch (error) {
+      lastResult = { ok: false, message: error?.message ?? 'Nao foi possivel finalizar o grupo.' }
+    }
+
+    setActionOrderId(null)
+    setKitchenMessage({
+      type: lastResult?.ok === false ? 'error' : 'success',
+      text: lastResult?.ok === false ? lastResult.message : 'Grupo finalizado e salvo.',
     })
   }
 
@@ -286,6 +351,12 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
         </div>
       </Card>
 
+      {kitchenMessage && (
+        <div className={`form-${kitchenMessage.type === 'error' ? 'alert' : 'hint'} kitchen-inline-feedback`}>
+          {kitchenMessage.text}
+        </div>
+      )}
+
       {viewMode === 'individual' ? (
         <div className="kitchen-grid">
           {activeOrders.length === 0 ? (
@@ -328,14 +399,14 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
                 <div className="kitchen-ticket-actions">
                   <button
                     className="ghost-button"
-                    disabled={order.priority === 'alta'}
+                    disabled={order.priority === 'alta' || Boolean(actionOrderId)}
                     type="button"
-                    onClick={() => onPrioritizeOrder?.(order.id)}
+                    onClick={() => handlePrioritizeOrder(order)}
                   >
-                    Priorizar
+                    {actionOrderId === order.id ? 'Salvando...' : 'Priorizar'}
                   </button>
-                  <button className="primary-button" type="button" onClick={() => onAdvanceOrder(order.id)}>
-                    {actionLabel(order.status)}
+                  <button className="primary-button" disabled={Boolean(actionOrderId)} type="button" onClick={() => handleAdvanceOrder(order)}>
+                    {actionOrderId === order.id ? 'Salvando...' : actionLabel(order.status)}
                   </button>
                 </div>
               </Card>
@@ -375,20 +446,20 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
                       </div>
                       <button
                         className="ghost-button"
-                        disabled={order.priority === 'alta'}
+                        disabled={order.priority === 'alta' || Boolean(actionOrderId)}
                         type="button"
-                        onClick={() => onPrioritizeOrder?.(order.id)}
+                        onClick={() => handlePrioritizeOrder(order)}
                       >
-                        Priorizar
+                        {actionOrderId === order.id ? 'Salvando...' : 'Priorizar'}
                       </button>
-                      <button className="ghost-button" type="button" onClick={() => onAdvanceOrder(order.id)}>
-                        {actionLabel(order.status)}
+                      <button className="ghost-button" disabled={Boolean(actionOrderId)} type="button" onClick={() => handleAdvanceOrder(order)}>
+                        {actionOrderId === order.id ? 'Salvando...' : actionLabel(order.status)}
                       </button>
                     </div>
                   ))}
                 </div>
-                <button className="primary-button" type="button" onClick={() => handleAdvanceGroup(group.orders)}>
-                  Finalizar grupo
+                <button className="primary-button" disabled={Boolean(actionOrderId)} type="button" onClick={() => handleAdvanceGroup(group.orders)}>
+                  {actionOrderId === `group-${group.source}` ? 'Salvando grupo...' : 'Finalizar grupo'}
                 </button>
               </Card>
             )
@@ -397,6 +468,42 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
       )}
 
       <Card>
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Historico</p>
+            <h2>Ultimos atendimentos</h2>
+          </div>
+          <label className="compact-filter-label">
+            Filtrar
+            <select value={completedSourceFilter} onChange={(event) => setCompletedSourceFilter(event.target.value)}>
+              {completedSourceOptions.map((source) => (
+                <option key={source} value={source}>{source === 'todos' ? 'Todos' : source}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="kitchen-completed-stack">
+          {visibleCompletedOrders.length === 0 ? (
+            <p className="empty-state">Nenhum atendimento finalizado neste filtro.</p>
+          ) : visibleCompletedOrders.slice(0, 14).map((order) => (
+            <details className="kitchen-completed-item" key={order.id}>
+              <summary>
+                <span>
+                  <strong>{order.item}</strong>
+                  <small>
+                    {order.source} - {new Date(order.completedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {minutesBetween(order.createdAt, order.completedAt)} min
+                  </small>
+                </span>
+                <StatusBadge status={order.status} />
+              </summary>
+              <KitchenInstructions compact order={order} />
+              <p>ID: {order.id}</p>
+            </details>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="kitchen-performance-card">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Performance</p>
@@ -415,29 +522,6 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
               </div>
             ))
           )}
-        </div>
-      </Card>
-
-      <Card>
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Historico</p>
-            <h2>Ultimos atendimentos</h2>
-          </div>
-        </div>
-        <div className="list-stack">
-          {sortedCompletedOrders.slice(0, 14).map((order) => (
-            <div className="list-row" key={order.id}>
-              <div>
-                <strong>{order.item}</strong>
-                <span>
-                  {order.source} - finalizado {new Date(order.completedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {minutesBetween(order.createdAt, order.completedAt)} min de producao
-                </span>
-                <KitchenInstructions compact order={order} />
-              </div>
-              <StatusBadge status={order.status} />
-            </div>
-          ))}
         </div>
       </Card>
     </div>

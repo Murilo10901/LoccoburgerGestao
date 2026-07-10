@@ -1,6 +1,9 @@
 export function saveProduct({ currentProducts, product }) {
   const productId = product.id ? Number(product.id) : Date.now()
+  const currentProduct = currentProducts.find((item) => item.id === productId)
   const recipeId = product.recipeId && product.recipeId !== 'new-sheet' ? Number(product.recipeId) : null
+  const currentChannels = currentProduct?.availableChannels ?? {}
+  const productChannels = product.availableChannels ?? {}
   const payload = {
     id: productId,
     sku: product.sku.trim(),
@@ -11,6 +14,11 @@ export function saveProduct({ currentProducts, product }) {
     price: Number(product.price),
     active: product.active ?? true,
     recipeId,
+    imageUrl: String(product.imageUrl ?? currentProduct?.imageUrl ?? '').trim(),
+    availableChannels: {
+      delivery: productChannels.delivery ?? currentChannels.delivery ?? true,
+      qr: productChannels.qr ?? currentChannels.qr ?? true,
+    },
   }
 
   if (!payload.sku || !payload.name || !payload.category || !payload.type || payload.price < 0) return currentProducts

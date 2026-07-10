@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BrandLogo } from './BrandLogo.jsx'
 
 export function Header({
@@ -33,6 +33,8 @@ export function Header({
   const [maintenanceMessage, setMaintenanceMessage] = useState(null)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [dismissedToastId, setDismissedToastId] = useState(null)
+  const notificationsRef = useRef(null)
+  const maintenanceRef = useRef(null)
   const visibleNotificationPages = accessProfiles[activeProfile]?.pages ?? []
   const visibleNotifications = activeProfile === 'admin'
     ? notifications
@@ -50,6 +52,32 @@ export function Header({
     const timeoutId = window.setTimeout(() => setDismissedToastId(latestNotification.id), 5200)
     return () => window.clearTimeout(timeoutId)
   }, [latestNotification])
+
+  useEffect(() => {
+    if (!notificationsOpen && !maintenanceOpen) return undefined
+
+    const handlePointerDown = (event) => {
+      const target = event.target
+      if (notificationsOpen && notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setNotificationsOpen(false)
+      }
+      if (maintenanceOpen && maintenanceRef.current && !maintenanceRef.current.contains(target)) {
+        setMaintenanceOpen(false)
+      }
+    }
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return
+      setNotificationsOpen(false)
+      setMaintenanceOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [maintenanceOpen, notificationsOpen])
 
   async function runMaintenance(actionId, handler, confirmText) {
     if (!handler) return
@@ -84,7 +112,7 @@ export function Header({
         <h1>{pageTitle}</h1>
       </div>
       <div className="header-actions">
-        <div className="admin-notifications">
+        <div className="admin-notifications" ref={notificationsRef}>
           <button
             className={`notification-button ${visibleNotifications.length > 0 ? 'has-items' : ''}`}
             type="button"
@@ -144,14 +172,12 @@ export function Header({
         ) : (
           <span className="role-pill">{profileLabel}</span>
         )}
-        {userProfile?.store_name && <span className="role-pill">{userProfile.store_name}</span>}
         {shouldShowRepositoryStatus && (
           <span className={`storage-pill storage-${repositoryStatus.mode}`}>{repositoryStatus.label}</span>
         )}
-        {syncStatus && <span className={`sync-pill sync-${syncStatus.mode}`}>{syncStatus.label}</span>}
         {userEmail && <span className="user-email-pill">{userEmail}</span>}
         {canRunMaintenance && (
-          <div className="maintenance-actions">
+          <div className="maintenance-actions" ref={maintenanceRef}>
             <button
               className="ghost-button reset-button"
               type="button"
@@ -231,7 +257,6 @@ export function Header({
         <button className="ghost-button logout-button" type="button" onClick={onLogout}>
           Sair
         </button>
-        <span className="shift-pill">Turno Noite</span>
         <BrandLogo compact />
       </div>
       {showNotificationToast && (

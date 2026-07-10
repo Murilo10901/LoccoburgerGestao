@@ -191,7 +191,7 @@ export function CustomerDeliveryMenu({ products = [] }) {
   const [ordersVersion, setOrdersVersion] = useState(0)
   const cartRef = useRef(null)
 
-  const activeProducts = products.filter((product) => product.active)
+  const activeProducts = products.filter((product) => product.active && (product.availableChannels?.delivery ?? true))
   const categories = [
     allCategoriesLabel,
     ...Array.from(new Set(activeProducts.map((product) => product.category))).filter(Boolean),
@@ -771,7 +771,7 @@ export function CustomerDeliveryMenu({ products = [] }) {
                 <section className="client-product-grid">
                   {visibleProducts.map((product) => (
                     <article className="client-product-card" key={product.id}>
-                      <img src={product.category === 'Porcao' ? '/locco-site/order-burger-drip-v1.png' : '/locco-site/hero-burger-v2.png'} alt="" />
+                      <img src={product.imageUrl || (product.category === 'Porcao' ? '/locco-site/order-burger-drip-v1.png' : '/locco-site/hero-burger-v2.png')} alt="" />
                       <div>
                         <span>{product.category}</span>
                         <strong>{product.name}</strong>
@@ -788,7 +788,7 @@ export function CustomerDeliveryMenu({ products = [] }) {
                     <div className="client-product-modal">
                       <button className="client-modal-close" type="button" onClick={closeProductCustomization}>x</button>
                       <div className="client-product-modal-head">
-                        <img src={customizingProduct.category === 'Porcao' ? '/locco-site/order-burger-drip-v1.png' : '/locco-site/hero-burger-v2.png'} alt="" />
+                        <img src={customizingProduct.imageUrl || (customizingProduct.category === 'Porcao' ? '/locco-site/order-burger-drip-v1.png' : '/locco-site/hero-burger-v2.png')} alt="" />
                         <div>
                           <p className="eyebrow">{customizingProduct.category}</p>
                           <h2>{customizingProduct.name}</h2>

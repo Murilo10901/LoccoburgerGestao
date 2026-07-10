@@ -17,12 +17,41 @@ const emptyProductForm = {
   category: 'Burger',
   type: 'Produto acabado',
   description: '',
+  imageUrl: '',
   price: '',
   recipeId: '',
+  availableChannels: {
+    delivery: true,
+    qr: true,
+  },
+}
+
+function normalizeProductForm(product = emptyProductForm) {
+  return {
+    id: product.id ?? '',
+    sku: product.sku ?? '',
+    name: product.name ?? '',
+    category: product.category ?? 'Burger',
+    type: product.type ?? 'Produto acabado',
+    description: product.description ?? '',
+    imageUrl: product.imageUrl ?? '',
+    price: product.price ?? '',
+    recipeId: product.recipeId ?? '',
+    availableChannels: {
+      delivery: product.availableChannels?.delivery ?? true,
+      qr: product.availableChannels?.qr ?? true,
+    },
+  }
+}
+
+function getProductImage(product) {
+  if (product.imageUrl) return product.imageUrl
+  return product.category === 'Porcao' ? '/locco-site/order-burger-drip-v1.png' : '/locco-site/hero-burger-v2.png'
 }
 
 export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSaveProduct, onToggleProduct, products, technicalSheets }) {
   const [productForm, setProductForm] = useState(emptyProductForm)
+  const [productModalOpen, setProductModalOpen] = useState(false)
   const [productSaving, setProductSaving] = useState(false)
   const productsWithSheet = products.filter((product) => product.recipeId)
   const [simulatorProductId, setSimulatorProductId] = useState(productsWithSheet[0]?.id ?? '')
@@ -39,16 +68,19 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
   const marginRanking = getPortfolioMarginRanking({ inventoryItems, products, technicalSheets }).slice(0, 5)
 
   function handleEditProduct(product) {
-    setProductForm({
-      id: product.id,
-      sku: product.sku,
-      name: product.name,
-      category: product.category,
-      type: product.type,
-      description: product.description ?? '',
-      price: product.price,
-      recipeId: product.recipeId ?? '',
-    })
+    setProductForm(normalizeProductForm(product))
+    setProductModalOpen(true)
+  }
+
+  function handleNewProduct() {
+    setProductForm(normalizeProductForm())
+    setProductModalOpen(true)
+  }
+
+  function closeProductModal() {
+    if (productSaving) return
+    setProductForm(emptyProductForm)
+    setProductModalOpen(false)
   }
 
   async function handleDeleteProduct(product) {
@@ -71,8 +103,21 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
       ...productForm,
       active: editingProduct?.active ?? true,
     })
-    if (result?.ok !== false) setProductForm(emptyProductForm)
+    if (result?.ok !== false) {
+      setProductForm(emptyProductForm)
+      setProductModalOpen(false)
+    }
     setProductSaving(false)
+  }
+
+  function updateProductChannel(channel, checked) {
+    setProductForm((form) => ({
+      ...form,
+      availableChannels: {
+        ...(form.availableChannels ?? emptyProductForm.availableChannels),
+        [channel]: checked,
+      },
+    }))
   }
 
   function updateSimulatedCost(inventoryItemId, value) {
@@ -218,7 +263,7 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
             <p className="eyebrow">Cardapio</p>
             <h2>Produtos e precos</h2>
           </div>
-          <button className="primary-button" type="button" onClick={() => setProductForm(emptyProductForm)}>
+          <button className="primary-button" type="button" onClick={handleNewProduct}>
             Novo produto
           </button>
         </div>
@@ -231,11 +276,20 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
 
             return (
               <div className="product-row product-row-rich" key={product.id}>
-                <div className="product-thumb">{product.name.slice(0, 2).toUpperCase()}</div>
+                <div className="product-thumb">
+                  {product.imageUrl ? (
+                    <img src={getProductImage(product)} alt="" />
+                  ) : (
+                    product.name.slice(0, 2).toUpperCase()
+                  )}
+                </div>
                 <div>
                   <strong>{product.name}</strong>
                   <span>{product.sku} - {product.category} - {product.type}</span>
                   {product.description && <small>{product.description}</small>}
+                  <small className="product-channel-note">
+                    {(product.availableChannels?.delivery ?? true) ? 'Delivery' : 'Delivery oculto'} · {(product.availableChannels?.qr ?? true) ? 'QR mesas' : 'QR oculto'}
+                  </small>
                 </div>
                 <div className="metric-cell">
                   <span>Venda</span>
@@ -274,103 +328,155 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
         </div>
       </Card>
 
-      <Card>
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Cadastro</p>
-            <h2>{editingProduct ? 'Editar produto' : 'Novo produto'}</h2>
-          </div>
-        </div>
-        <form className="entry-form" onSubmit={handleSubmit}>
-          <div className="form-grid">
-            <label>
-              SKU
-              <input
-                value={productForm.sku}
-                onChange={(event) => setProductForm((form) => ({ ...form, sku: event.target.value }))}
-                placeholder="BUR-003"
-              />
-            </label>
-            <label>
-              Preco
-              <input
-                min="0"
-                step="0.01"
-                type="number"
-                value={productForm.price}
-                onChange={(event) => setProductForm((form) => ({ ...form, price: event.target.value }))}
-                placeholder="0,00"
-              />
-            </label>
-          </div>
-          <label>
-            Nome
-            <input
-              value={productForm.name}
-              onChange={(event) => setProductForm((form) => ({ ...form, name: event.target.value }))}
-              placeholder="Nome do produto"
-            />
-          </label>
-          <label>
-            Descricao no cardapio
-            <textarea
-              rows="3"
-              value={productForm.description}
-              onChange={(event) => setProductForm((form) => ({ ...form, description: event.target.value }))}
-              placeholder="Ex.: Pao brioche, blend artesanal, queijo, bacon e maionese da casa."
-            />
-          </label>
-          <div className="form-grid">
-            <label>
-              Categoria
-              <input
-                value={productForm.category}
-                onChange={(event) => setProductForm((form) => ({ ...form, category: event.target.value }))}
-              />
-            </label>
-            <label>
-              Tipo
-              <select
-                value={productForm.type}
-                onChange={(event) => setProductForm((form) => ({ ...form, type: event.target.value }))}
-              >
-                <option>Produto acabado</option>
-                <option>Combo</option>
-                <option>Adicional</option>
-                <option>Bebida</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            Ficha tecnica
-            <select
-              value={productForm.recipeId}
-              onChange={(event) => setProductForm((form) => ({ ...form, recipeId: event.target.value }))}
-            >
-              <option value="">Sem ficha vinculada</option>
-              <option value="new-sheet">Criar ficha tecnica vazia</option>
-              {technicalSheets.map((sheet) => {
-                const product = products.find((item) => item.id === sheet.productId)
-                return (
-                  <option key={sheet.id} value={sheet.id}>
-                    {product?.name ?? `Ficha ${sheet.id}`}
-                  </option>
-                )
-              })}
-            </select>
-          </label>
-          <div className="form-actions">
-            <button className="primary-button" disabled={productSaving} type="submit">
-              {productSaving ? 'Salvando...' : 'Salvar produto'}
-            </button>
-            {editingProduct && (
-              <button className="ghost-button" type="button" onClick={() => setProductForm(emptyProductForm)}>
+      {productModalOpen && (
+        <div className="product-editor-overlay" role="dialog" aria-modal="true" aria-labelledby="product-editor-title">
+          <form className="product-editor-modal entry-form" onSubmit={handleSubmit}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Cardapio</p>
+                <h2 id="product-editor-title">{editingProduct ? 'Editar produto' : 'Novo produto'}</h2>
+              </div>
+              <button className="ghost-button" type="button" onClick={closeProductModal}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="product-editor-body">
+              <div className="product-image-preview">
+                <img src={getProductImage(productForm)} alt="" />
+                <span>Previa da imagem no cardapio</span>
+              </div>
+
+              <div className="product-editor-fields">
+                <div className="form-grid">
+                  <label>
+                    SKU
+                    <input
+                      value={productForm.sku}
+                      onChange={(event) => setProductForm((form) => ({ ...form, sku: event.target.value }))}
+                      placeholder="BUR-003"
+                    />
+                  </label>
+                  <label>
+                    Preco
+                    <input
+                      min="0"
+                      step="0.01"
+                      type="number"
+                      value={productForm.price}
+                      onChange={(event) => setProductForm((form) => ({ ...form, price: event.target.value }))}
+                      placeholder="0,00"
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  Nome
+                  <input
+                    value={productForm.name}
+                    onChange={(event) => setProductForm((form) => ({ ...form, name: event.target.value }))}
+                    placeholder="Nome do produto"
+                  />
+                </label>
+
+                <label>
+                  Link da imagem
+                  <input
+                    value={productForm.imageUrl}
+                    onChange={(event) => setProductForm((form) => ({ ...form, imageUrl: event.target.value }))}
+                    placeholder="/locco-site/hero-burger-v2.png ou URL da imagem"
+                  />
+                </label>
+
+                <label>
+                  Descricao no cardapio
+                  <textarea
+                    rows="3"
+                    value={productForm.description}
+                    onChange={(event) => setProductForm((form) => ({ ...form, description: event.target.value }))}
+                    placeholder="Ex.: Pao brioche, blend artesanal, queijo, bacon e maionese da casa."
+                  />
+                </label>
+
+                <div className="form-grid">
+                  <label>
+                    Categoria
+                    <input
+                      value={productForm.category}
+                      onChange={(event) => setProductForm((form) => ({ ...form, category: event.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Tipo
+                    <select
+                      value={productForm.type}
+                      onChange={(event) => setProductForm((form) => ({ ...form, type: event.target.value }))}
+                    >
+                      <option>Produto acabado</option>
+                      <option>Combo</option>
+                      <option>Adicional</option>
+                      <option>Bebida</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label>
+                  Ficha tecnica
+                  <select
+                    value={productForm.recipeId}
+                    onChange={(event) => setProductForm((form) => ({ ...form, recipeId: event.target.value }))}
+                  >
+                    <option value="">Sem ficha vinculada</option>
+                    <option value="new-sheet">Criar ficha tecnica vazia</option>
+                    {technicalSheets.map((sheet) => {
+                      const product = products.find((item) => item.id === sheet.productId)
+                      return (
+                        <option key={sheet.id} value={sheet.id}>
+                          {product?.name ?? `Ficha ${sheet.id}`}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </label>
+
+                <div className="product-channel-grid" aria-label="Onde esse produto aparece">
+                  <label>
+                    <input
+                      checked={productForm.availableChannels?.delivery ?? true}
+                      type="checkbox"
+                      onChange={(event) => updateProductChannel('delivery', event.target.checked)}
+                    />
+                    <span>
+                      <strong>Mostrar no delivery</strong>
+                      <small>Produto aparece no app de entrega.</small>
+                    </span>
+                  </label>
+                  <label>
+                    <input
+                      checked={productForm.availableChannels?.qr ?? true}
+                      type="checkbox"
+                      onChange={(event) => updateProductChannel('qr', event.target.checked)}
+                    />
+                    <span>
+                      <strong>Mostrar no QR das mesas</strong>
+                      <small>Produto aparece para clientes no restaurante.</small>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="form-actions product-editor-actions">
+              <button className="primary-button" disabled={productSaving} type="submit">
+                {productSaving ? 'Salvando...' : 'Salvar produto'}
+              </button>
+              <button className="ghost-button" type="button" onClick={closeProductModal}>
                 Cancelar
               </button>
-            )}
-          </div>
-        </form>
-      </Card>
+            </div>
+          </form>
+        </div>
+      )}
 
       <Card>
         <div className="section-heading">

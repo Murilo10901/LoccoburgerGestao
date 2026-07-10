@@ -19,7 +19,6 @@ export const realtimeTables = [
   'user_cash_closing_methods',
   'user_restaurant_tables',
   'user_kitchen_tickets',
-  'user_whatsapp_messages',
 ]
 
 const realtimeDebounceMs = 650

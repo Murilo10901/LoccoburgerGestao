@@ -22,6 +22,7 @@ export function TechnicalSheet({
   inventoryItems,
   onAddIngredient,
   onCreateSheet,
+  onDeleteSheet,
   onRemoveIngredient,
   onUpdateSheet,
   products,
@@ -154,6 +155,53 @@ export function TechnicalSheet({
     }
   }
 
+  async function handleCreateSheet(product) {
+    if (savingAction) return
+    setSavingAction(`create-${product.id}`)
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onCreateSheet(product.id)),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      setSheetMessage({
+        sheetId: 'new',
+        ok: result?.ok !== false,
+        text: result?.message ?? `Ficha tecnica criada para ${product.name}.`,
+      })
+    } catch (error) {
+      setSheetMessage({ sheetId: 'new', ok: false, text: error?.message ?? 'Nao foi possivel criar a ficha tecnica.' })
+    } finally {
+      setSavingAction(null)
+    }
+  }
+
+  async function handleDeleteSheet(sheet, product) {
+    if (savingAction) return
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir a ficha tecnica de ${product?.name ?? 'este produto'}?\n\nEssa acao remove os insumos da ficha e o produto deixa de dar baixa automatica ate receber uma nova ficha. Nao da para reverter automaticamente.`,
+    )
+    if (!confirmed) return
+
+    setSavingAction(`delete-${sheet.id}`)
+
+    try {
+      const [result] = await Promise.all([
+        Promise.resolve(onDeleteSheet?.(sheet.id)),
+        new Promise((resolve) => window.setTimeout(resolve, 450)),
+      ])
+      setSheetMessage({
+        sheetId: 'new',
+        ok: result?.ok !== false,
+        text: result?.message ?? 'Ficha tecnica excluida.',
+      })
+    } catch (error) {
+      setSheetMessage({ sheetId: sheet.id, ok: false, text: error?.message ?? 'Nao foi possivel excluir a ficha tecnica.' })
+    } finally {
+      setSavingAction(null)
+    }
+  }
+
   return (
     <div className="recipe-grid">
       {productsWithoutSheet.length > 0 && (
@@ -165,6 +213,9 @@ export function TechnicalSheet({
             </div>
             <span className="soft-label">{productsWithoutSheet.length} produtos</span>
           </div>
+          {sheetMessage?.sheetId === 'new' && (
+            <div className={sheetMessage.ok ? 'form-hint' : 'form-alert'}>{sheetMessage.text}</div>
+          )}
           <div className="list-stack">
             {productsWithoutSheet.map((product) => (
               <div className="list-row" key={product.id}>
@@ -172,8 +223,13 @@ export function TechnicalSheet({
                   <strong>{product.name}</strong>
                   <span>{product.sku} - {product.category} - {currency.format(product.price)}</span>
                 </div>
-                <button className="secondary-button" type="button" onClick={() => onCreateSheet(product.id)}>
-                  Criar ficha
+                <button
+                  className="secondary-button"
+                  disabled={savingAction === `create-${product.id}`}
+                  type="button"
+                  onClick={() => handleCreateSheet(product)}
+                >
+                  {savingAction === `create-${product.id}` ? 'Criando...' : 'Criar ficha'}
                 </button>
               </div>
             ))}
@@ -199,7 +255,17 @@ export function TechnicalSheet({
                 <p className="eyebrow">{product.category}</p>
                 <h2>{product.name}</h2>
               </div>
-              <StatusBadge status={product.active ? 'com-ficha' : 'inativo'} />
+              <div className="recipe-heading-actions">
+                <StatusBadge status={product.active ? 'com-ficha' : 'inativo'} />
+                <button
+                  className="ghost-button danger-button"
+                  disabled={savingAction === `delete-${sheet.id}`}
+                  type="button"
+                  onClick={() => handleDeleteSheet(sheet, product)}
+                >
+                  {savingAction === `delete-${sheet.id}` ? 'Excluindo...' : 'Excluir ficha'}
+                </button>
+              </div>
             </div>
 
             <div className="recipe-metrics">

@@ -9,9 +9,15 @@ function mapProductFromSupabase(product) {
     name: product.name,
     category: product.category,
     type: product.type,
+    description: product.description ?? '',
     price: Number(product.price),
     active: product.active,
     recipeId: product.recipe_app_id ? Number(product.recipe_app_id) : null,
+    imageUrl: product.image_url ?? '',
+    availableChannels: {
+      delivery: product.available_delivery ?? true,
+      qr: product.available_qr ?? true,
+    },
   }
 }
 

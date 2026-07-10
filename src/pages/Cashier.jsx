@@ -25,6 +25,29 @@ function getTabTotal(tab) {
   return (tab.orderItems ?? []).reduce((total, item) => total + item.total, 0)
 }
 
+function isWholeTableClosing(table) {
+  return table?.status === 'fechamento' && Number(table.total || 0) > 0
+}
+
+function getClosingTabs(table) {
+  return getTableTabs(table ?? {}).filter((tab) => tab.status === 'fechamento' && getTabTotal(tab) > 0)
+}
+
+function isPayableTable(table) {
+  return isWholeTableClosing(table) || getClosingTabs(table).length > 0
+}
+
+function getInitialPaymentScope(table) {
+  if (!table) return 'all'
+  if (isWholeTableClosing(table)) return 'all'
+  return getClosingTabs(table)[0]?.id ?? 'all'
+}
+
+function getPayableTableTotal(table) {
+  if (isWholeTableClosing(table)) return Number(table.total || 0)
+  return getClosingTabs(table).reduce((total, tab) => total + getTabTotal(tab), 0)
+}
+
 function getTableItems(table) {
   const directItems = table?.orderItems ?? []
   if (directItems.length > 0) return directItems
@@ -42,8 +65,13 @@ function parseMoney(value) {
   return Number.isFinite(parsedValue) ? parsedValue : 0
 }
 
+function isDateOnlyKey(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value ?? '').trim())
+}
+
 function getPaymentDateKey(payment) {
   const rawValue = payment?.paidAtIso || payment?.createdAtIso || payment?.paidAt
+  if (isDateOnlyKey(rawValue)) return String(rawValue).trim()
   const dateKey = getLocalDateKey(rawValue)
   return dateKey || 'sem-data'
 }
@@ -55,6 +83,13 @@ function formatDateFilterLabel(dateKey) {
 
 function getPaymentTimestamp(payment) {
   const rawValue = payment?.paidAtIso || payment?.createdAtIso || payment?.paidAt
+  if (isDateOnlyKey(rawValue)) {
+    const [year, month, day] = String(rawValue).split('-').map(Number)
+    const timeMatch = String(payment?.time ?? '').match(/^(\d{1,2})(?::(\d{1,2}))?/)
+    const hour = timeMatch ? Number(timeMatch[1]) : 0
+    const minute = timeMatch ? Number(timeMatch[2] ?? 0) : 0
+    return new Date(year, month - 1, day, hour, minute).getTime()
+  }
   const parsed = rawValue ? new Date(rawValue).getTime() : 0
   if (Number.isFinite(parsed) && parsed > 0) return parsed
 
@@ -94,22 +129,26 @@ export function Cashier({
   onCloseCashierShift,
   onCloseDeliveryPayment,
   onCloseTablePayment,
+  onReopenTableClose,
   payments,
   tables,
 }) {
-  const payableTables = tables.filter((table) => Number(table.total || 0) > 0)
-  const closingTablesCount = tables.filter((table) => table.status === 'fechamento' && Number(table.total || 0) > 0).length
+  const payableTables = tables.filter(isPayableTable)
+  const closingTablesCount = payableTables.reduce((total, table) => {
+    if (isWholeTableClosing(table)) return total + 1
+    return total + getClosingTabs(table).length
+  }, 0)
   const payableDeliveries = deliveries.filter((order) => {
     const alreadyPaid = order.paymentStatus === 'pago' ||
       payments.some((payment) => payment.source === 'delivery' && payment.deliveryId === order.id)
 
     return !alreadyPaid && !['recusado', 'cancelado'].includes(order.status)
   })
-  const totalPayableAccounts = payableTables.length + payableDeliveries.length
+  const totalPayableAccounts = closingTablesCount + payableDeliveries.length
   const [accountType, setAccountType] = useState(payableTables.length > 0 ? 'mesa' : 'delivery')
   const [selectedTableId, setSelectedTableId] = useState(payableTables[0]?.id ?? '')
   const [selectedDeliveryId, setSelectedDeliveryId] = useState(payableDeliveries[0]?.id ?? '')
-  const [paymentScope, setPaymentScope] = useState('all')
+  const [paymentScope, setPaymentScope] = useState(() => getInitialPaymentScope(payableTables[0]))
   const [paymentMethod, setPaymentMethod] = useState('pix')
   const [discount, setDiscount] = useState('')
   const [serviceCharge, setServiceCharge] = useState('')
@@ -138,6 +177,9 @@ export function Cashier({
     [accountType, payableDeliveries, selectedDeliveryId],
   )
   const selectedTabs = selectedTable ? getTableTabs(selectedTable) : []
+  const selectedClosingTabs = selectedTable ? getClosingTabs(selectedTable) : []
+  const selectedWholeTableClosing = Boolean(selectedTable && isWholeTableClosing(selectedTable))
+  const payableSelectedTabs = selectedWholeTableClosing ? selectedTabs : selectedClosingTabs
   const selectedTab = selectedTabs.find((tab) => tab.id === paymentScope)
   const selectedTableItems = selectedTable ? getTableItems(selectedTable) : []
   const selectedItems = selectedDelivery
@@ -209,7 +251,7 @@ export function Cashier({
   useEffect(() => {
     if (accountType === 'mesa' && payableTables.length > 0 && !selectedTable) {
       setSelectedTableId(payableTables[0].id)
-      setPaymentScope('all')
+      setPaymentScope(getInitialPaymentScope(payableTables[0]))
     }
 
     if (accountType === 'delivery' && payableDeliveries.length > 0 && !selectedDelivery) {
@@ -220,7 +262,7 @@ export function Cashier({
     if (accountType === 'delivery' && payableDeliveries.length === 0 && payableTables.length > 0) {
       setAccountType('mesa')
       setSelectedTableId(payableTables[0].id)
-      setPaymentScope('all')
+      setPaymentScope(getInitialPaymentScope(payableTables[0]))
     }
 
     if (accountType === 'mesa' && payableTables.length === 0 && payableDeliveries.length > 0) {
@@ -229,6 +271,17 @@ export function Cashier({
       setPaymentScope('all')
     }
   }, [accountType, payableDeliveries, payableTables, selectedDelivery, selectedTable])
+
+  useEffect(() => {
+    if (!selectedTable || accountType !== 'mesa') return
+
+    const selectedTabExists = selectedTabs.some((tab) => tab.id === paymentScope)
+    const currentScopeIsValid = paymentScope === 'all'
+      ? isWholeTableClosing(selectedTable)
+      : selectedTabExists && (getClosingTabs(selectedTable).some((tab) => tab.id === paymentScope) || isWholeTableClosing(selectedTable))
+
+    if (!currentScopeIsValid) setPaymentScope(getInitialPaymentScope(selectedTable))
+  }, [accountType, paymentScope, selectedTable, selectedTabs])
 
   async function handlePayment(event) {
     event.preventDefault()
@@ -374,6 +427,30 @@ export function Cashier({
     setClosingNotes('')
   }
 
+  async function handleReopenSelectedTableAccount() {
+    if (!selectedTable || paymentProcessing) return
+
+    setPaymentProcessing(true)
+    setPaymentMessage({ ok: true, text: 'Reabrindo conta no atendimento...' })
+
+    const result = await Promise.resolve(onReopenTableClose?.(selectedTable.id, {
+      tabId: paymentScope === 'all' ? null : paymentScope,
+    }) ?? { ok: false, message: 'Acao de reabertura nao configurada.' })
+      .catch((error) => ({ ok: false, message: error?.message ?? 'Nao foi possivel reabrir a conta.' }))
+      .finally(() => setPaymentProcessing(false))
+
+    if (result?.ok === false) {
+      setPaymentMessage({ ok: false, text: result.message })
+      return
+    }
+
+    const nextTable = payableTables.find((table) => table.id !== selectedTable.id)
+    setSelectedTableId(nextTable?.id ?? '')
+    setPaymentScope(nextTable ? getInitialPaymentScope(nextTable) : 'all')
+    if (!nextTable && payableDeliveries.length > 0) setAccountType('delivery')
+    setPaymentMessage({ ok: true, text: result?.message ?? 'Conta reaberta no atendimento.' })
+  }
+
   return (
     <div className="cashier-grid">
       {(paymentProcessing || closingProcessing) && (
@@ -402,7 +479,7 @@ export function Cashier({
         <Card className="stat-card">
           <span>Total pendente</span>
           <strong>{currency.format(
-            payableTables.reduce((total, table) => total + table.total, 0) +
+            payableTables.reduce((total, table) => total + getPayableTableTotal(table), 0) +
             payableDeliveries.reduce((total, order) => total + Number(order.total || 0), 0),
           )}</strong>
         </Card>
@@ -434,15 +511,19 @@ export function Cashier({
                   onClick={() => {
                     setAccountType('mesa')
                     setSelectedTableId(table.id)
-                    setPaymentScope('all')
+                    setPaymentScope(getInitialPaymentScope(table))
                   }}
                 >
                   <div>
                     <strong>Mesa {String(table.id).padStart(2, '0')}</strong>
-                    <span>{getTableItems(table).length} itens - {getTableTabs(table).length} comandas</span>
+                    <span>
+                      {isWholeTableClosing(table)
+                        ? `${getTableItems(table).length} itens - mesa inteira`
+                        : `${getClosingTabs(table).length} comanda(s) em fechamento`}
+                    </span>
                   </div>
                   <StatusBadge status={table.status} />
-                  <b>{currency.format(table.total)}</b>
+                  <b>{currency.format(getPayableTableTotal(table))}</b>
                 </button>
               ))}
               {payableDeliveries.map((order) => (
@@ -504,18 +585,20 @@ export function Cashier({
               </div>
             ) : (
             <div className="tab-summary-list">
-              <button
-                className={`tab-summary-row ${paymentScope === 'all' ? 'selected' : ''}`}
-                type="button"
-                onClick={() => setPaymentScope('all')}
-              >
-                <div>
-                  <strong>Mesa inteira</strong>
-                  <span>{selectedTableItems.length} itens</span>
-                </div>
-                <b>{currency.format(selectedTable.total)}</b>
-              </button>
-              {getTableTabs(selectedTable).map((tab) => (
+              {selectedWholeTableClosing && (
+                <button
+                  className={`tab-summary-row ${paymentScope === 'all' ? 'selected' : ''}`}
+                  type="button"
+                  onClick={() => setPaymentScope('all')}
+                >
+                  <div>
+                    <strong>Mesa inteira</strong>
+                    <span>{selectedTableItems.length} itens</span>
+                  </div>
+                  <b>{currency.format(selectedTable.total)}</b>
+                </button>
+              )}
+              {payableSelectedTabs.map((tab) => (
                 <button
                   className={`tab-summary-row ${paymentScope === tab.id ? 'selected' : ''}`}
                   key={tab.id}
@@ -550,8 +633,8 @@ export function Cashier({
               <label>
                 Receber
                 <select value={paymentScope} onChange={(event) => setPaymentScope(event.target.value)}>
-                  <option value="all">Mesa inteira</option>
-                  {selectedTabs.map((tab) => (
+                  {selectedWholeTableClosing && <option value="all">Mesa inteira</option>}
+                  {payableSelectedTabs.map((tab) => (
                     <option key={tab.id} value={tab.id}>
                       {tab.name} - {currency.format(getTabTotal(tab))}
                     </option>
@@ -687,6 +770,12 @@ export function Cashier({
                 <div><span>Servico</span><strong>{currency.format(serviceAmount)}</strong></div>
                 <div><span>A receber</span><strong>{currency.format(netAmount)}</strong></div>
               </div>
+
+              {!selectedDelivery && (
+                <button className="ghost-button" disabled={paymentProcessing} type="button" onClick={handleReopenSelectedTableAccount}>
+                  {paymentScope === 'all' ? 'Reabrir conta no atendimento' : 'Reabrir comanda no atendimento'}
+                </button>
+              )}
 
               <button className="primary-button" disabled={paymentProcessing} type="submit">
                 {paymentProcessing

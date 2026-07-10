@@ -841,3 +841,827 @@ html.loccoburger-public-page {
     font-size: clamp(2.92rem, 15.6vw, 4.35rem) !important;
   }
 }
+
+/* ==========================================================
+   LoccoBurger polish 2026
+   Camada final para alinhamento, tela "Ver app" e footer.
+   Mantida aqui porque este arquivo carrega por último.
+   ========================================================== */
+
+html.loccoburger-public-page,
+html.loccoburger-public-page body {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+.locco-premium {
+  --locco-page-max: 1240px;
+  --locco-page-gutter: clamp(18px, 5vw, 64px);
+  --locco-card-bg: rgba(7, 18, 11, 0.72);
+  --locco-card-border: rgba(255, 196, 51, 0.18);
+  text-rendering: geometricPrecision;
+}
+
+.locco-premium-cursor-trail {
+  z-index: 105 !important;
+  opacity: 0.42 !important;
+  mix-blend-mode: screen !important;
+}
+
+.locco-premium-cursor-dot {
+  z-index: 106 !important;
+  width: 11px !important;
+  height: 11px !important;
+  border-color: rgba(255, 248, 232, 0.78) !important;
+  background:
+    radial-gradient(circle, rgba(255, 248, 232, 0.96) 0 18%, rgba(255, 196, 51, 0.72) 23% 54%, transparent 62%) !important;
+  box-shadow: 0 0 14px rgba(255, 196, 51, 0.62), 0 0 32px rgba(255, 173, 20, 0.18) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) section[id] {
+  scroll-margin-top: 96px !important;
+}
+
+html.loccoburger-motion-ready .locco-premium [data-locco-reveal] {
+  transition-duration: 420ms, 460ms, 460ms !important;
+  transform: translate3d(0, 20px, 0) scale(0.985) !important;
+}
+
+html.loccoburger-motion-ready .locco-premium [data-locco-reveal].is-visible {
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-header,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-hero-grid {
+  width: min(calc(100% - (var(--locco-page-gutter) * 2)), var(--locco-page-max)) !important;
+  max-width: var(--locco-page-max) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-cards,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-app-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-location,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-footer {
+  width: min(calc(100% - (var(--locco-page-gutter) * 2)), var(--locco-page-max)) !important;
+  max-width: var(--locco-page-max) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-app-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-location {
+  border: 1px solid var(--locco-card-border) !important;
+  border-radius: clamp(24px, 2.6vw, 36px) !important;
+  overflow: hidden !important;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.055), rgba(255, 248, 232, 0.018)),
+    var(--locco-card-bg) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.22) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-section {
+  min-height: clamp(440px, 58svh, 640px) !important;
+  align-items: center !important;
+  margin-top: clamp(36px, 6vw, 76px) !important;
+  padding: clamp(34px, 5vw, 70px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-section h2 {
+  max-width: 10.5ch !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-section > p {
+  justify-self: end !important;
+  max-width: 58ch !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-cards {
+  gap: 14px !important;
+  padding: clamp(18px, 2.2vw, 28px) 0 clamp(46px, 7vw, 88px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-cards article {
+  min-height: 190px !important;
+  border: 1px solid rgba(255, 248, 232, 0.11) !important;
+  border-radius: 24px !important;
+  padding: clamp(22px, 2.5vw, 30px) !important;
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-app-section {
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.82fr) !important;
+  margin-top: clamp(46px, 7vw, 96px) !important;
+  padding: clamp(30px, 5vw, 62px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-app-card {
+  position: relative !important;
+  min-height: 340px !important;
+  border-radius: 28px !important;
+  overflow: hidden !important;
+  align-content: end !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-app-card::before {
+  position: absolute !important;
+  inset: 22px 22px auto !important;
+  height: 92px !important;
+  border: 1px solid rgba(255, 248, 232, 0.10) !important;
+  border-radius: 22px !important;
+  background:
+    linear-gradient(90deg, rgba(255, 196, 51, 0.16), transparent 46%),
+    rgba(0, 0, 0, 0.22) !important;
+  content: "" !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-app-card::after {
+  position: absolute !important;
+  top: 48px !important;
+  right: 46px !important;
+  width: 74px !important;
+  height: 50px !important;
+  border-radius: 16px !important;
+  background: url('/locco-site/hero-burger-v2.png') center / cover no-repeat !important;
+  content: "" !important;
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.38)) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+.locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section {
+  min-height: auto !important;
+  margin-top: clamp(46px, 7vw, 92px) !important;
+  padding: clamp(34px, 5vw, 70px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section {
+  grid-template-columns: minmax(0, 0.86fr) minmax(330px, 0.9fr) !important;
+  grid-template-areas:
+    "copy visual"
+    "detail visual" !important;
+  gap: clamp(26px, 5vw, 70px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-meat-image {
+  width: min(100%, 520px) !important;
+  max-height: 640px !important;
+  border-radius: 28px !important;
+  object-fit: cover !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section {
+  grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1fr) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-art {
+  min-height: clamp(300px, 38vw, 420px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section {
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.78fr) !important;
+  align-items: center !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-menu-card {
+  justify-self: center !important;
+  width: min(100%, 420px) !important;
+  border-radius: 28px !important;
+  background: #fff !important;
+  transform: perspective(900px) rotateY(-5deg) rotateX(2deg) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-menu-card img {
+  width: 100% !important;
+  max-height: 560px !important;
+  object-fit: contain !important;
+  object-position: top center !important;
+  background: #fff !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-location {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr) !important;
+  gap: 14px !important;
+  margin-top: clamp(48px, 8vw, 100px) !important;
+  margin-bottom: clamp(26px, 5vw, 64px) !important;
+  padding: clamp(16px, 2vw, 22px) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-location > div:first-child {
+  min-height: 360px !important;
+  border-radius: 24px !important;
+  padding: clamp(28px, 4vw, 50px) !important;
+  background:
+    radial-gradient(circle at 16% 15%, rgba(255, 196, 51, 0.14), transparent 16rem),
+    linear-gradient(135deg, rgba(0, 78, 42, 0.38), rgba(2, 8, 5, 0.18)) !important;
+}
+
+.locco-premium:not(.locco-premium-order-route) .locco-premium-hours {
+  border-radius: 24px !important;
+  padding: clamp(26px, 4vw, 38px) !important;
+  background: rgba(255, 255, 255, 0.045) !important;
+}
+
+/* Tela Ver app: agora segue o visual real do delivery. */
+.locco-premium-order-route {
+  min-height: 100svh !important;
+  padding: 0 !important;
+  overflow-x: clip !important;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255, 196, 51, 0.20), transparent min(34vw, 30rem)),
+    radial-gradient(circle at 10% 80%, rgba(24, 74, 44, 0.50), transparent min(42vw, 34rem)),
+    linear-gradient(135deg, #020403 0%, #07140c 48%, #10100d 100%) !important;
+}
+
+.locco-premium-order-route .locco-premium-order-experience {
+  display: grid !important;
+  grid-template-columns: minmax(320px, 0.86fr) minmax(390px, 1.08fr) !important;
+  gap: clamp(30px, 5vw, 78px) !important;
+  align-items: center !important;
+  width: min(calc(100% - clamp(36px, 8vw, 120px)), 1240px) !important;
+  min-height: 100svh !important;
+  margin: 0 auto !important;
+  padding: clamp(86px, 9vw, 120px) 0 clamp(38px, 6vw, 76px) !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+.locco-premium-order-route .locco-premium-order-experience::before {
+  inset: 13% auto auto 47% !important;
+  width: min(48vw, 38rem) !important;
+  height: min(48vw, 38rem) !important;
+  opacity: 0.76 !important;
+}
+
+.locco-premium-order-route .locco-premium-order-copy {
+  max-width: 580px !important;
+}
+
+.locco-premium-order-route .locco-premium-order-copy h2 {
+  max-width: 9.4ch !important;
+  font-size: clamp(3.1rem, 6vw, 6.35rem) !important;
+  line-height: 0.88 !important;
+  letter-spacing: -0.078em !important;
+}
+
+.locco-premium-order-route .locco-premium-order-copy p {
+  max-width: 55ch !important;
+  color: rgba(255, 248, 232, 0.72) !important;
+}
+
+.locco-premium-order-route .locco-premium-order-flow span {
+  border-color: rgba(255, 196, 51, 0.22) !important;
+  color: rgba(255, 248, 232, 0.84) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+}
+
+.locco-premium-order-route .locco-premium-order-ui-delivery {
+  width: 100% !important;
+  justify-content: center !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  perspective: 1200px !important;
+}
+
+.locco-delivery-preview,
+.locco-delivery-preview * {
+  box-sizing: border-box;
+}
+
+.locco-delivery-preview {
+  display: grid !important;
+  gap: 14px !important;
+  width: min(100%, 540px) !important;
+  max-height: min(760px, calc(100svh - 128px)) !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 196, 51, 0.26) !important;
+  border-radius: 34px !important;
+  padding: 16px !important;
+  color: #fff8e8 !important;
+  background:
+    radial-gradient(circle at 82% 12%, rgba(255, 196, 51, 0.18), transparent 16rem),
+    rgba(6, 12, 8, 0.92) !important;
+  box-shadow: 0 38px 100px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  transform: rotateY(-4deg) rotateX(1deg) !important;
+  transform-origin: center !important;
+}
+
+.locco-delivery-preview-topbar,
+.locco-delivery-preview-hero,
+.locco-delivery-preview-tabs,
+.locco-delivery-preview-cart,
+.locco-delivery-preview-list button {
+  border: 1px solid rgba(255, 196, 51, 0.16) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+}
+
+.locco-delivery-preview-topbar {
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 62px !important;
+  border-radius: 26px !important;
+  padding: 12px 16px !important;
+}
+
+.locco-delivery-preview-topbar span {
+  color: rgba(255, 248, 232, 0.82) !important;
+  font-weight: 760 !important;
+}
+
+.locco-delivery-preview-topbar strong {
+  color: #ffc433 !important;
+  font-weight: 1000 !important;
+}
+
+.locco-delivery-preview-topbar button {
+  justify-self: end !important;
+  border: 1px solid rgba(255, 248, 232, 0.18) !important;
+  border-radius: 999px !important;
+  padding: 9px 13px !important;
+  color: #fff8e8 !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  cursor: pointer !important;
+  font: inherit !important;
+  font-size: 0.78rem !important;
+  font-weight: 950 !important;
+}
+
+.locco-delivery-preview-hero {
+  display: grid !important;
+  grid-template-columns: 1fr 148px !important;
+  align-items: center !important;
+  min-height: 150px !important;
+  gap: 12px !important;
+  border-radius: 28px !important;
+  padding: 18px !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 88% 38%, rgba(255, 196, 51, 0.20), transparent 8rem),
+    rgba(6, 10, 7, 0.80) !important;
+}
+
+.locco-delivery-preview-hero p,
+.locco-delivery-preview-hero h3,
+.locco-delivery-preview-hero span {
+  margin: 0 !important;
+}
+
+.locco-delivery-preview-hero p {
+  color: #ff7f3b !important;
+  font-size: 0.73rem !important;
+  font-weight: 1000 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+}
+
+.locco-delivery-preview-hero h3 {
+  margin-top: 4px !important;
+  color: #fff !important;
+  font-size: clamp(1.75rem, 3vw, 2.35rem) !important;
+  line-height: 0.95 !important;
+  letter-spacing: -0.055em !important;
+}
+
+.locco-delivery-preview-hero span {
+  display: block !important;
+  margin-top: 6px !important;
+  color: rgba(255, 248, 232, 0.72) !important;
+  font-weight: 650 !important;
+}
+
+.locco-delivery-preview-hero img {
+  width: 168px !important;
+  max-width: 46vw !important;
+  border-radius: 0 !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.44)) !important;
+  transform: translateX(12px) !important;
+}
+
+.locco-delivery-preview-tabs,
+.locco-delivery-preview-categories {
+  display: flex !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+.locco-delivery-preview-tabs::-webkit-scrollbar,
+.locco-delivery-preview-categories::-webkit-scrollbar {
+  display: none !important;
+}
+
+.locco-delivery-preview-tabs {
+  border-radius: 999px !important;
+  padding: 6px !important;
+}
+
+.locco-delivery-preview-tabs button,
+.locco-delivery-preview-categories button {
+  flex: 0 0 auto !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: rgba(255, 248, 232, 0.78) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  cursor: pointer !important;
+  font: inherit !important;
+  font-weight: 950 !important;
+}
+
+.locco-delivery-preview-tabs button {
+  min-height: 40px !important;
+  padding: 9px 16px !important;
+}
+
+.locco-delivery-preview-tabs button.is-active,
+.locco-delivery-preview-categories button.is-active {
+  color: #171008 !important;
+  background: #ffc433 !important;
+}
+
+.locco-delivery-preview-cart {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 58px !important;
+  border-color: rgba(255, 196, 51, 0.32) !important;
+  border-radius: 22px !important;
+  padding: 10px 14px !important;
+  background:
+    radial-gradient(circle at 86% 50%, rgba(255, 196, 51, 0.16), transparent 46%),
+    rgba(255, 196, 51, 0.07) !important;
+}
+
+.locco-delivery-preview-cart span {
+  display: grid !important;
+  width: 36px !important;
+  height: 36px !important;
+  place-items: center !important;
+  border-radius: 14px !important;
+  background: #ffc433 !important;
+}
+
+.locco-delivery-preview-cart strong {
+  color: #fff8e8 !important;
+  font-weight: 1000 !important;
+}
+
+.locco-delivery-preview-cart b {
+  color: #ffc433 !important;
+  font-weight: 1000 !important;
+}
+
+.locco-delivery-preview-categories {
+  padding: 4px 0 !important;
+}
+
+.locco-delivery-preview-categories button {
+  min-height: 44px !important;
+  border: 1px solid rgba(255, 196, 51, 0.16) !important;
+  padding: 10px 16px !important;
+}
+
+.locco-delivery-preview-list {
+  display: grid !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding-right: 3px !important;
+  scrollbar-color: rgba(255, 196, 51, 0.42) transparent !important;
+  scrollbar-width: thin !important;
+}
+
+.locco-delivery-preview-list button {
+  display: grid !important;
+  grid-template-columns: 82px 1fr 42px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-height: 108px !important;
+  border-radius: 22px !important;
+  padding: 12px !important;
+  color: #fff8e8 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  font: inherit !important;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease !important;
+}
+
+.locco-delivery-preview-list button:hover,
+.locco-delivery-preview-list button.is-active {
+  border-color: rgba(255, 196, 51, 0.58) !important;
+  background: rgba(255, 196, 51, 0.10) !important;
+  transform: translateY(-2px) !important;
+}
+
+.locco-delivery-preview-list img {
+  width: 82px !important;
+  height: 72px !important;
+  border-radius: 18px !important;
+  object-fit: cover !important;
+}
+
+.locco-delivery-preview-list span {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.locco-delivery-preview-list small {
+  color: rgba(255, 248, 232, 0.68) !important;
+  font-size: 0.76rem !important;
+  font-style: normal !important;
+}
+
+.locco-delivery-preview-list strong {
+  overflow: hidden !important;
+  color: #fff !important;
+  font-size: 0.96rem !important;
+  font-weight: 1000 !important;
+  line-height: 1.12 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.locco-delivery-preview-list em {
+  display: -webkit-box !important;
+  overflow: hidden !important;
+  color: rgba(255, 248, 232, 0.66) !important;
+  font-size: 0.76rem !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  line-height: 1.22 !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+.locco-delivery-preview-list b {
+  color: #ffc433 !important;
+  font-size: 0.82rem !important;
+  font-weight: 1000 !important;
+}
+
+.locco-delivery-preview-list i {
+  display: grid !important;
+  width: 40px !important;
+  height: 40px !important;
+  place-items: center !important;
+  border-radius: 16px !important;
+  color: #171008 !important;
+  background: #ffc433 !important;
+  font-style: normal !important;
+  font-size: 1.35rem !important;
+  font-weight: 950 !important;
+}
+
+/* Footer profissional */
+.locco-premium:not(.locco-premium-order-route) .locco-premium-footer {
+  display: block !important;
+  border: 1px solid rgba(255, 196, 51, 0.16) !important;
+  border-radius: clamp(24px, 2.6vw, 34px) !important;
+  margin-top: 0 !important;
+  margin-bottom: clamp(22px, 4vw, 46px) !important;
+  padding: clamp(24px, 4vw, 40px) !important;
+  color: rgba(255, 248, 232, 0.72) !important;
+  background:
+    radial-gradient(circle at 10% 8%, rgba(255, 196, 51, 0.12), transparent 18rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(4, 10, 6, 0.82) !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.24) !important;
+}
+
+.locco-footer-main {
+  display: grid !important;
+  grid-template-columns: minmax(260px, 1.3fr) repeat(3, minmax(140px, 0.75fr)) !important;
+  gap: clamp(20px, 4vw, 52px) !important;
+  align-items: start !important;
+}
+
+.locco-footer-brand {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 14px !important;
+  color: #fff8e8 !important;
+}
+
+.locco-footer-brand .brand-logo img {
+  width: 58px !important;
+  height: 58px !important;
+  border: 1px solid rgba(255, 196, 51, 0.55) !important;
+  box-shadow: 0 0 0 7px rgba(255, 196, 51, 0.06), 0 18px 34px rgba(0, 0, 0, 0.34) !important;
+}
+
+.locco-footer-brand span,
+.locco-footer-column {
+  display: grid !important;
+  gap: 9px !important;
+}
+
+.locco-footer-brand strong,
+.locco-footer-column strong {
+  color: #fff8e8 !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.locco-footer-brand small {
+  max-width: 240px !important;
+  color: rgba(255, 248, 232, 0.68) !important;
+  font-weight: 750 !important;
+  line-height: 1.45 !important;
+}
+
+.locco-footer-column strong {
+  margin-bottom: 3px !important;
+  color: #ffc433 !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.13em !important;
+  text-transform: uppercase !important;
+}
+
+.locco-footer-column a {
+  color: rgba(255, 248, 232, 0.72) !important;
+  font-size: 0.92rem !important;
+  font-weight: 780 !important;
+  transition: color 180ms ease, transform 180ms ease !important;
+}
+
+.locco-footer-column a:hover,
+.locco-footer-column a:focus-visible {
+  color: #fff8e8 !important;
+  transform: translateX(3px) !important;
+}
+
+.locco-premium-admin-footer-link {
+  color: rgba(255, 196, 51, 0.72) !important;
+}
+
+.locco-footer-bottom {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  margin-top: clamp(24px, 4vw, 38px) !important;
+  border-top: 1px solid rgba(255, 248, 232, 0.10) !important;
+  padding-top: 18px !important;
+  color: rgba(255, 248, 232, 0.56) !important;
+  font-size: 0.82rem !important;
+}
+
+.locco-footer-bottom small {
+  color: rgba(255, 196, 51, 0.72) !important;
+  font-weight: 850 !important;
+}
+
+@media (max-width: 1100px) {
+  .locco-premium-order-route .locco-premium-order-experience {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+  }
+
+  .locco-premium-order-route .locco-premium-order-copy {
+    max-width: 820px !important;
+  }
+
+  .locco-delivery-preview {
+    max-height: none !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-app-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-location {
+    grid-template-columns: 1fr !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section {
+    grid-template-areas:
+      "copy"
+      "visual"
+      "detail" !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section {
+    grid-template-areas: none !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-section > p {
+    justify-self: start !important;
+  }
+
+  .locco-footer-main {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .locco-footer-brand {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .locco-premium {
+    --locco-page-gutter: 14px;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-app-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-location,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-footer {
+    border-radius: 24px !important;
+    padding: 22px !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-cards {
+    width: min(calc(100% - 28px), var(--locco-page-max)) !important;
+  }
+
+  .locco-premium-order-route .locco-premium-order-experience {
+    width: min(calc(100% - 28px), 1240px) !important;
+    padding-top: 78px !important;
+  }
+
+  .locco-premium-order-route .locco-premium-order-copy h2 {
+    font-size: clamp(2.7rem, 14vw, 4.05rem) !important;
+  }
+
+  .locco-delivery-preview {
+    width: 100% !important;
+    border-radius: 28px !important;
+    padding: 12px !important;
+  }
+
+  .locco-delivery-preview-hero {
+    grid-template-columns: 1fr 104px !important;
+    min-height: 132px !important;
+    padding: 14px !important;
+  }
+
+  .locco-delivery-preview-hero img {
+    width: 128px !important;
+  }
+
+  .locco-delivery-preview-tabs,
+  .locco-delivery-preview-cart,
+  .locco-delivery-preview-categories,
+  .locco-delivery-preview-list {
+    font-size: 0.88rem !important;
+  }
+
+  .locco-delivery-preview-list button {
+    grid-template-columns: 70px 1fr 36px !important;
+    gap: 10px !important;
+    min-height: 100px !important;
+    padding: 10px !important;
+  }
+
+  .locco-delivery-preview-list img {
+    width: 70px !important;
+    height: 64px !important;
+  }
+
+  .locco-delivery-preview-list i {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .locco-footer-main {
+    grid-template-columns: 1fr !important;
+  }
+
+  .locco-footer-bottom {
+    display: grid !important;
+  }
+}
+
+@media (max-width: 980px) {
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section {
+    grid-template-areas:
+      "copy"
+      "art" !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section {
+    grid-template-areas:
+      "copy"
+      "card" !important;
+  }
+}

@@ -4,6 +4,9 @@ import { BrandLogo } from '../components/BrandLogo.jsx'
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export function Dashboard({ data, icons }) {
+  const hourlySales = data.hourlySales?.length ? data.hourlySales : [{ label: 'Hoje', value: 0 }]
+  const topProducts = data.topProducts?.length ? data.topProducts : []
+  const alerts = data.alerts?.length ? data.alerts : ['Nenhum alerta critico no momento.']
   const stats = [
     { label: 'Vendas do dia', value: currency.format(data.salesToday), icon: icons.ReceiptText },
     { label: 'Pedidos abertos', value: data.openOrders, icon: icons.BarChart3 },
@@ -11,7 +14,7 @@ export function Dashboard({ data, icons }) {
     { label: 'Alertas de estoque', value: data.stockAlerts, icon: icons.Boxes },
   ]
 
-  const maxSale = Math.max(...data.hourlySales.map((item) => item.value))
+  const maxSale = Math.max(1, ...hourlySales.map((item) => item.value))
 
   return (
     <div className="page-grid">
@@ -47,7 +50,7 @@ export function Dashboard({ data, icons }) {
           <span className="soft-label">Hoje</span>
         </div>
         <div className="bar-chart">
-          {data.hourlySales.map((item) => (
+          {hourlySales.map((item) => (
             <div className="bar-item" key={item.label}>
               <div className="bar-track">
                 <span style={{ height: `${Math.max((item.value / maxSale) * 100, 12)}%` }} />
@@ -66,7 +69,9 @@ export function Dashboard({ data, icons }) {
           </div>
         </div>
         <div className="list-stack">
-          {data.topProducts.map((product) => (
+          {topProducts.length === 0 ? (
+            <p className="empty-state">Nenhum produto vendido hoje ainda.</p>
+          ) : topProducts.map((product) => (
             <div className="list-row" key={product.name}>
               <div>
                 <strong>{product.name}</strong>
@@ -86,7 +91,7 @@ export function Dashboard({ data, icons }) {
           </div>
         </div>
         <div className="alert-list">
-          {data.alerts.map((alert) => (
+          {alerts.map((alert) => (
             <p key={alert}>{alert}</p>
           ))}
         </div>

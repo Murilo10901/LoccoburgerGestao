@@ -107,7 +107,7 @@ export function Delivery({
   technicalSheets,
   whatsAppMessages = [],
 }) {
-  const activeProducts = products.filter((product) => product.active)
+  const activeProducts = products.filter((product) => product.active && (product.availableChannels?.delivery ?? true))
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? '')
   const [orderForm, setOrderForm] = useState({
     channel: 'WhatsApp',
