@@ -49,10 +49,52 @@ function getProductImage(product) {
   return product.category === 'Porcao' ? '/locco-site/order-burger-drip-v1.png' : '/locco-site/hero-burger-v2.png'
 }
 
+function normalizeSearchText(value = '') {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function getProductSkuNumber(sku = '') {
+  const match = String(sku ?? '').match(/(\d+)/)
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER
+}
+
+function compareProducts(firstProduct, secondProduct) {
+  const firstCategory = String(firstProduct?.category ?? '')
+  const secondCategory = String(secondProduct?.category ?? '')
+  if (firstCategory !== secondCategory) return firstCategory.localeCompare(secondCategory, 'pt-BR')
+
+  const firstSkuPrefix = String(firstProduct?.sku ?? '').replace(/\d+/g, '')
+  const secondSkuPrefix = String(secondProduct?.sku ?? '').replace(/\d+/g, '')
+  if (firstSkuPrefix !== secondSkuPrefix) return firstSkuPrefix.localeCompare(secondSkuPrefix, 'pt-BR')
+
+  const firstSkuNumber = getProductSkuNumber(firstProduct?.sku)
+  const secondSkuNumber = getProductSkuNumber(secondProduct?.sku)
+  if (firstSkuNumber !== secondSkuNumber) return firstSkuNumber - secondSkuNumber
+
+  return String(firstProduct?.name ?? '').localeCompare(String(secondProduct?.name ?? ''), 'pt-BR')
+}
+
+function matchesProductSearch(product, searchTerm) {
+  if (!searchTerm) return true
+  return [
+    product.name,
+    product.sku,
+    product.category,
+    product.type,
+    product.description,
+  ].some((field) => normalizeSearchText(field).includes(searchTerm))
+}
+
 export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSaveProduct, onToggleProduct, products, technicalSheets }) {
   const [productForm, setProductForm] = useState(emptyProductForm)
   const [productModalOpen, setProductModalOpen] = useState(false)
   const [productSaving, setProductSaving] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
+  const [productSearch, setProductSearch] = useState('')
   const productsWithSheet = products.filter((product) => product.recipeId)
   const [simulatorProductId, setSimulatorProductId] = useState(productsWithSheet[0]?.id ?? '')
   const [simulatedCosts, setSimulatedCosts] = useState({})
@@ -66,6 +108,14 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
     technicalSheets,
   })
   const marginRanking = getPortfolioMarginRanking({ inventoryItems, products, technicalSheets }).slice(0, 5)
+  const productCategories = Array.from(
+    new Set(products.map((product) => product.category).filter(Boolean)),
+  ).sort((firstCategory, secondCategory) => firstCategory.localeCompare(secondCategory, 'pt-BR'))
+  const productSearchTerm = normalizeSearchText(productSearch)
+  const visibleProducts = products
+    .filter((product) => categoryFilter === 'Todas' || product.category === categoryFilter)
+    .filter((product) => matchesProductSearch(product, productSearchTerm))
+    .sort(compareProducts)
 
   function handleEditProduct(product) {
     setProductForm(normalizeProductForm(product))
@@ -268,8 +318,34 @@ export function Products({ inventoryItems, onCreateSheet, onDeleteProduct, onSav
           </button>
         </div>
 
+        <div className="admin-filter-strip">
+          <label className="admin-filter-field">
+            Filtrar categoria
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="Todas">Todas as categorias</option>
+              {productCategories.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-filter-field admin-filter-field-wide">
+            Buscar item
+            <input
+              value={productSearch}
+              onChange={(event) => setProductSearch(event.target.value)}
+              placeholder="Nome, codigo, categoria ou descricao"
+            />
+          </label>
+          <span className="filter-result-pill">
+            {visibleProducts.length} de {products.length} produto(s)
+          </span>
+        </div>
+
         <div className="product-list">
-          {products.map((product) => {
+          {visibleProducts.length === 0 && (
+            <p className="empty-state">Nenhum produto encontrado nesse filtro.</p>
+          )}
+          {visibleProducts.map((product) => {
             const recipe = technicalSheets.find((sheet) => sheet.id === product.recipeId)
             const cost = getRecipeUnitCost(recipe, inventoryItems)
             const margin = product.price ? ((product.price - cost) / product.price) * 100 : 0

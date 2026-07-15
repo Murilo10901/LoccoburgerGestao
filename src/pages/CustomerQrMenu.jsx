@@ -4,6 +4,7 @@ import {
   clearClientQrSession,
   closeClientQrBroadcastChannel,
   createClientQrBroadcastChannel,
+  filterCurrentOperationClientQrOrders,
   getClientQrSessionIdentity,
   getNextClientQrSessionExpiration,
   loadActiveClientQrSessionIdentity,
@@ -15,6 +16,7 @@ import {
   publishClientQrOrderReliable,
   publishClientQrOrders,
   publishClientQrOrdersRequest,
+  saveClientQrOrders,
   saveActiveClientQrSessionIdentity,
   saveClientQrSession,
   updateClientQrOrder,
@@ -133,6 +135,18 @@ function isActiveCloseRequest(order) {
   return order?.type === 'fechamento' && !['recusado', 'erro', 'pago', 'fechado', 'cancelado'].includes(String(order.status ?? '').toLowerCase())
 }
 
+function isApprovedCloseRequest(order) {
+  return order?.type === 'fechamento' && String(order.status ?? '').toLowerCase() === 'aprovado'
+}
+
+function isCompletedCloseRequest(order) {
+  return order?.type === 'fechamento' && ['pago', 'fechado'].includes(String(order.status ?? '').toLowerCase())
+}
+
+function canRetryQrOrder(order) {
+  return order?.type !== 'fechamento' && ['recusado', 'erro'].includes(String(order?.status ?? '').toLowerCase())
+}
+
 function orderBelongsToCurrentSession(order, tableNumber, session) {
   if (!session) return false
   if (String(order?.tableNumber ?? '').trim() !== String(tableNumber ?? '').trim()) return false
@@ -150,12 +164,16 @@ function findRestorableClientQrSession(tableNumber, form) {
   const storedSession = identity ? loadClientQrSession(tableNumber, identity) : null
   if (storedSession) return storedSession
 
-  const matchingOrders = loadClientQrOrders()
+  const matchingOrders = filterCurrentOperationClientQrOrders(loadClientQrOrders())
     .filter((order) => orderBelongsToCustomer(order, tableNumber, identity, form))
     .sort((first, second) => new Date(second.createdAt ?? 0).getTime() - new Date(first.createdAt ?? 0).getTime())
 
+  const openOrders = matchingOrders.filter((order) => order.type !== 'fechamento' && !isClosedQrOrderStatus(order.status))
   const openCloseRequest = matchingOrders.find(isActiveCloseRequest)
-  const activeOrder = matchingOrders.find((order) => order.sessionId && !isClosedQrOrderStatus(order.status))
+  const approvedCloseWithoutOpenOrders = isApprovedCloseRequest(openCloseRequest) && openOrders.length === 0
+  if (approvedCloseWithoutOpenOrders) return null
+
+  const activeOrder = openOrders.find((order) => order.sessionId)
   const sourceOrder = activeOrder ?? openCloseRequest
   if (!sourceOrder) return null
 
@@ -237,19 +255,19 @@ export function CustomerQrMenu({ products = [] }) {
   const visibleProducts = selectedCategory === allCategoriesLabel
     ? activeProducts
     : activeProducts.filter((product) => product.category === selectedCategory)
-  const recentOrders = useMemo(() => loadClientQrOrders()
+  const recentOrders = useMemo(() => filterCurrentOperationClientQrOrders(loadClientQrOrders())
     .filter((order) => orderBelongsToCurrentSession(order, tableNumber, session))
     .slice(0, 12), [ordersVersion, session?.customerName, session?.id, session?.phone, tableNumber])
-  const activeCloseRequest = recentOrders.find(isActiveCloseRequest)
-  const hasActiveCloseRequest = Boolean(activeCloseRequest)
-  const canCancelCloseRequest = String(activeCloseRequest?.status ?? '').toLowerCase() === 'novo'
-  const hasCompletedCloseRequest = recentOrders.some((order) =>
-    order.type === 'fechamento' && ['pago', 'fechado'].includes(String(order.status ?? '').toLowerCase()),
-  )
-  const sessionClosingRequested = Boolean(session?.closingRequested || hasActiveCloseRequest)
   const sessionOpenTotal = recentOrders
     .filter((order) => order.type !== 'fechamento' && !isClosedQrOrderStatus(order.status))
     .reduce((total, order) => total + Number(order.total || 0), 0)
+  const rawActiveCloseRequest = recentOrders.find(isActiveCloseRequest)
+  const shouldReleaseEmptyApprovedClose = Boolean(isApprovedCloseRequest(rawActiveCloseRequest) && sessionOpenTotal <= 0)
+  const activeCloseRequest = shouldReleaseEmptyApprovedClose ? null : rawActiveCloseRequest
+  const hasActiveCloseRequest = Boolean(activeCloseRequest)
+  const canCancelCloseRequest = String(activeCloseRequest?.status ?? '').toLowerCase() === 'novo'
+  const hasCompletedCloseRequest = shouldReleaseEmptyApprovedClose || recentOrders.some(isCompletedCloseRequest)
+  const sessionClosingRequested = Boolean(session?.closingRequested || hasActiveCloseRequest)
   const lastSubmittedOrder = recentOrders.find((order) => order.id === lastSubmittedOrderId) ?? recentOrders[0] ?? null
   const selectedHistoryOrder = recentOrders.find((order) => order.id === selectedHistoryOrderId) ?? null
   const cartTotal = cart.reduce((total, item) => total + item.total, 0)
@@ -278,8 +296,13 @@ export function CustomerQrMenu({ products = [] }) {
     setLastSubmittedOrderId(null)
     setSelectedHistoryOrderId(null)
     setQrScreen('menu')
-    setMessage({ ok: true, text: 'Pagamento confirmado. A comanda foi encerrada e a mesa esta liberada.' })
-  }, [hasActiveCloseRequest, hasCompletedCloseRequest, session, tableNumber])
+    setMessage({
+      ok: true,
+      text: shouldReleaseEmptyApprovedClose
+        ? 'Comanda sem consumo em aberto. A mesa foi liberada para uma nova comanda.'
+        : 'Pagamento confirmado. A comanda foi encerrada e a mesa esta liberada.',
+    })
+  }, [hasActiveCloseRequest, hasCompletedCloseRequest, session, shouldReleaseEmptyApprovedClose, tableNumber])
 
   useEffect(() => {
     if (!cartToast) return undefined
@@ -314,11 +337,14 @@ export function CustomerQrMenu({ products = [] }) {
 
     if (!result.ok || !result.orders.length) return []
 
-    mergeAndSaveClientQrOrders(result.orders)
+    const currentOperationOrders = filterCurrentOperationClientQrOrders(result.orders)
+    if (!currentOperationOrders.length) return []
+
+    mergeAndSaveClientQrOrders(currentOperationOrders)
     setOrdersVersion((version) => version + 1)
 
     const currentSession = sessionRef.current
-    const activeCloseOrder = result.orders.find(isActiveCloseRequest)
+    const activeCloseOrder = currentOperationOrders.find(isActiveCloseRequest)
     if (currentSession && activeCloseOrder && !currentSession.closingRequested) {
       const nextSession = { ...currentSession, closingRequested: true }
       saveClientQrSession(tableNumber, nextSession)
@@ -342,11 +368,14 @@ export function CustomerQrMenu({ products = [] }) {
 
       if (!active || !result.ok || !result.orders.length) return
 
-      mergeAndSaveClientQrOrders(result.orders)
+      const currentOperationOrders = filterCurrentOperationClientQrOrders(result.orders)
+      if (!currentOperationOrders.length) return
+
+      mergeAndSaveClientQrOrders(currentOperationOrders)
       setOrdersVersion((version) => version + 1)
 
       const currentSession = sessionRef.current
-      const activeCloseOrder = result.orders.find(isActiveCloseRequest)
+      const activeCloseOrder = currentOperationOrders.find(isActiveCloseRequest)
       if (currentSession && activeCloseOrder && !currentSession.closingRequested) {
         const nextSession = { ...currentSession, closingRequested: true }
         saveClientQrSession(tableNumber, nextSession)
@@ -364,12 +393,19 @@ export function CustomerQrMenu({ products = [] }) {
   }, [session?.customerName, session?.id, session?.phone, tableNumber])
 
   useEffect(() => {
-    const syncOrders = () => setOrdersVersion((version) => version + 1)
+    const syncOrders = () => {
+      const storedOrders = loadClientQrOrders()
+      const currentOperationOrders = filterCurrentOperationClientQrOrders(storedOrders)
+      if (currentOperationOrders.length !== storedOrders.length) {
+        saveClientQrOrders(currentOperationOrders)
+      }
+      setOrdersVersion((version) => version + 1)
+    }
     const mergeIncomingOrders = (incomingOrders) => {
       const currentSession = sessionRef.current
       const currentSessionId = currentSession?.id
       const currentIdentity = getClientQrSessionIdentity(currentSession ?? {})
-      const relevantOrders = incomingOrders.filter((order) => {
+      const relevantOrders = filterCurrentOperationClientQrOrders(incomingOrders).filter((order) => {
         if (String(order?.tableNumber ?? '') !== String(tableNumber)) return false
         if (currentSessionId && order.sessionId === currentSessionId) return true
         if (currentIdentity && getOrderSessionIdentity(order) === currentIdentity) return true
@@ -417,7 +453,7 @@ export function CustomerQrMenu({ products = [] }) {
         const currentIdentity = getClientQrSessionIdentity(currentSession ?? {})
         if (!currentIdentity) return
 
-        const currentOrders = loadClientQrOrders().filter((order) => (
+        const currentOrders = filterCurrentOperationClientQrOrders(loadClientQrOrders()).filter((order) => (
           String(order?.tableNumber ?? '').trim() === String(tableNumber) &&
           getOrderSessionIdentity(order) === currentIdentity
         ))
@@ -489,6 +525,24 @@ export function CustomerQrMenu({ products = [] }) {
     })
   }
 
+  function logoutQrSession() {
+    if (!session) return
+
+    const identity = getClientQrSessionIdentity(session)
+    clearClientQrSession(tableNumber, session)
+    clearClientQrDraft(tableNumber, identity)
+    setSession(null)
+    setCart([])
+    setItemNotes('')
+    setCustomItemNotes('')
+    setCustomizingProduct(null)
+    setLastSubmittedOrderId(null)
+    setSelectedHistoryOrderId(null)
+    setQrScreen('menu')
+    setCustomerForm({ customerName: '', phone: '' })
+    setMessage({ ok: true, text: 'Voce saiu desta comanda neste aparelho. Para voltar, digite nome e telefone.' })
+  }
+
   function openProductCustomization(product) {
     if (sessionClosingRequested) {
       setMessage({ ok: false, text: 'Sua comanda esta em fechamento. Procure o caixa para liberar uma nova sessao.' })
@@ -555,6 +609,44 @@ export function CustomerQrMenu({ products = [] }) {
       setCustomMeatPoint(defaultMeatPoint)
       setCustomItemNotes('')
     }, 520)
+  }
+
+  function retryQrOrder(order) {
+    if (!order || !canRetryQrOrder(order)) return
+
+    if (sessionClosingRequested) {
+      setMessage({ ok: false, text: 'Sua comanda esta em fechamento. Procure o caixa antes de reenviar pedidos.' })
+      return
+    }
+
+    const retryItems = (order.items ?? []).map((item, index) => {
+      const quantity = Math.max(1, Number(item.quantity || 1))
+      const unitPrice = Number(item.unitPrice ?? item.price ?? (Number(item.total || 0) / quantity) ?? 0)
+
+      return {
+        ...item,
+        id: `retry-${Date.now()}-${index}-${Math.random().toString(16).slice(2, 7)}`,
+        quantity,
+        unitPrice,
+        total: unitPrice * quantity,
+        notes: item.notes ?? '',
+        manualNotes: item.manualNotes ?? '',
+        modifiers: item.modifiers ?? null,
+      }
+    })
+
+    if (!retryItems.length) {
+      setMessage({ ok: false, text: 'Nao encontrei itens neste pedido para reenviar.' })
+      return
+    }
+
+    setCart(retryItems)
+    setItemNotes('')
+    setSelectedHistoryOrderId(order.id)
+    setLastSubmittedOrderId(null)
+    setQrScreen('menu')
+    setMessage({ ok: true, text: 'Pedido recusado copiado para o carrinho. Confira e envie novamente.' })
+    window.setTimeout(() => scrollToCart(), 120)
   }
 
   function addToCart(product) {
@@ -732,7 +824,13 @@ export function CustomerQrMenu({ products = [] }) {
         <header className="client-menu-header">
           <span>Mesa {tableNumber}</span>
           <strong>LoccoBurger</strong>
-          <small>Pedido digital</small>
+          {session ? (
+            <button className="client-logout-button" type="button" onClick={logoutQrSession}>
+              Sair
+            </button>
+          ) : (
+            <small>Pedido digital</small>
+          )}
         </header>
 
         {!session ? (
@@ -744,7 +842,7 @@ export function CustomerQrMenu({ products = [] }) {
               <input
                 value={customerForm.customerName}
                 onChange={(event) => setCustomerForm((form) => ({ ...form, customerName: event.target.value }))}
-                placeholder="Ex.: Murilo"
+                placeholder="Digite seu nome"
               />
             </label>
             <label>
@@ -753,7 +851,7 @@ export function CustomerQrMenu({ products = [] }) {
                 inputMode="tel"
                 value={customerForm.phone}
                 onChange={(event) => setCustomerForm((form) => ({ ...form, phone: event.target.value }))}
-                placeholder="(11) 99999-9999"
+                placeholder="Digite seu numero"
               />
             </label>
             <button className="client-primary-button" type="submit">Abrir cardapio</button>
@@ -1100,6 +1198,11 @@ export function CustomerQrMenu({ products = [] }) {
                     <span>Total</span>
                     <strong>{currency.format(selectedHistoryOrder.total || 0)}</strong>
                   </footer>
+                  {canRetryQrOrder(selectedHistoryOrder) && (
+                    <button className="client-primary-button" disabled={sessionClosingRequested} type="button" onClick={() => retryQrOrder(selectedHistoryOrder)}>
+                      Corrigir e enviar novamente
+                    </button>
+                  )}
                 </article>
               )}
             </section>

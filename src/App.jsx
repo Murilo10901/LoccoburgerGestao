@@ -46,7 +46,19 @@ import {
   saveClientQrOrderToSupabase,
   subscribeToClientQrOrdersFromSupabase,
 } from './lib/clientQrSupabaseRepository.js'
-import { loadClientDeliveryOrders, saveClientDeliveryOrders, updateClientDeliveryOrder } from './lib/clientDeliveryOrders.js'
+import {
+  loadClientDeliveryOrders,
+  mergeAndSaveClientDeliveryOrders,
+  mergeClientDeliveryOrders,
+  saveClientDeliveryOrders,
+  updateClientDeliveryOrder,
+} from './lib/clientDeliveryOrders.js'
+import {
+  closeClientDeliveryOrdersSupabaseSubscription,
+  loadClientDeliveryOrdersFromSupabase,
+  saveClientDeliveryOrderToSupabase,
+  subscribeToClientDeliveryOrdersFromSupabase,
+} from './lib/clientDeliverySupabaseRepository.js'
 import {
   clearAdminNotifications,
   loadAdminNotifications,
@@ -426,6 +438,7 @@ function LandingMaintenancePage() {
   const [publicScreen, setPublicScreen] = useState(() => (
     typeof window !== 'undefined' && window.location.hash === '#pedido' ? 'order' : 'home'
   ))
+  const [isPublicMenuOpen, setIsPublicMenuOpen] = useState(false)
   const visibleOrderProducts = selectedOrderCategory === 'Todos'
     ? orderProducts
     : orderProducts.filter((product) => product.category === selectedOrderCategory)
@@ -448,6 +461,7 @@ function LandingMaintenancePage() {
 
   const openOrderScreen = (event) => {
     event.preventDefault()
+    setIsPublicMenuOpen(false)
     setPublicScreen('order')
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', '#pedido')
@@ -456,11 +470,31 @@ function LandingMaintenancePage() {
   }
 
   const closeOrderScreen = () => {
+    setIsPublicMenuOpen(false)
     setPublicScreen('home')
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', `${window.location.pathname}${window.location.search}`)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsPublicMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  const closePublicMenu = () => {
+    setIsPublicMenuOpen(false)
   }
 
   const orderExperience = (
@@ -591,7 +625,25 @@ function LandingMaintenancePage() {
             </span>
           </a>
 
-          <nav aria-label="Navegacao do site LoccoBurger">
+          <button
+            className="locco-premium-menu-button"
+            type="button"
+            aria-label={isPublicMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={isPublicMenuOpen}
+            aria-controls="locco-public-menu"
+            onClick={() => setIsPublicMenuOpen((open) => !open)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
+          <nav
+            id="locco-public-menu"
+            className={`locco-premium-nav-drawer ${isPublicMenuOpen ? 'is-open' : ''}`}
+            aria-label="Navegacao do site LoccoBurger"
+            onClick={closePublicMenu}
+          >
             <a href="#quem-somos">Quem somos</a>
             <a href="#brasa">Na brasa</a>
             <a href={deliveryUrl}>Delivery</a>
@@ -600,6 +652,13 @@ function LandingMaintenancePage() {
             <a href="#cardapio">Cardápio</a>
             <a href="#localizacao">Localização</a>
           </nav>
+
+          <button
+            className={`locco-premium-menu-backdrop ${isPublicMenuOpen ? 'is-open' : ''}`}
+            type="button"
+            aria-label="Fechar menu"
+            onClick={closePublicMenu}
+          />
 
           <div className="locco-premium-header-actions">
             <a className="locco-premium-order-link" href="#pedido" onClick={openOrderScreen}>
@@ -933,10 +992,13 @@ const initialExpenses = [
 ]
 
 const kitchenStatusFlow = ['em preparo', 'finalizado']
-const remoteSyncIntervalMs = 60000
-const remoteSyncMinRefreshMs = 9000
-const remoteApplyWriteGuardMs = 4500
-const localWriteSyncGuardMs = 12000
+const remoteSyncIntervalMs = 15000
+const remoteSyncMinRefreshMs = 2500
+const remoteApplyWriteGuardMs = 2500
+const localWriteSyncGuardMs = 3500
+const localClientSyncIntervalMs = 5000
+const remoteClientSyncIntervalMs = 20000
+const clientSyncRequestIntervalMs = 30000
 const deviceViewStorageKey = 'loccoburger-device-view'
 
 const deviceViewOptions = [
@@ -1135,8 +1197,8 @@ function createDefaultTablesState() {
 const legacyMockTableBlueprint = new Map(tables.map((table) => [Number(table.id), table]))
 
 function tableHasOrderItems(table) {
-  return (table?.orderItems ?? []).length > 0 ||
-    (table?.tabs ?? []).some((tab) => (tab.orderItems ?? []).length > 0)
+  return getCurrentOperationTableOrderItems(table?.orderItems ?? []).length > 0 ||
+    (table?.tabs ?? []).some((tab) => getCurrentOperationTableOrderItems(tab.orderItems ?? []).length > 0)
 }
 
 function isLegacyMockTable(table) {
@@ -1159,6 +1221,25 @@ function isLegacyMockTable(table) {
 
   return (!hasRealItems && !hasCustomerName && sameStatus && sameAttendant && sameTotal && noQrMetadata) ||
     emptyResetLegacyTable
+}
+
+function getTableOrderItemTime(orderItem = {}) {
+  const rawDate = orderItem.createdAt ?? orderItem.submittedAt ?? orderItem.updatedAt ?? orderItem.sourceSubmittedAt
+  const parsedDate = rawDate ? Date.parse(rawDate) : Number.NaN
+  if (Number.isFinite(parsedDate)) return parsedDate
+
+  const numericId = Number(String(orderItem.id ?? '').match(/\d{10,}/)?.[0])
+  return Number.isFinite(numericId) ? numericId : 0
+}
+
+function isCurrentOperationTableOrderItem(orderItem = {}) {
+  const orderItemTime = getTableOrderItemTime(orderItem)
+  if (!orderItemTime) return true
+  return orderItemTime >= getOperationWindowStartTime()
+}
+
+function getCurrentOperationTableOrderItems(orderItems = []) {
+  return (Array.isArray(orderItems) ? orderItems : []).filter(isCurrentOperationTableOrderItem)
 }
 
 function getNormalizedTableNumber(table) {
@@ -1194,9 +1275,24 @@ function normalizeTableRecord(table) {
   const tableNumber = String(table.tableNumber ?? mainTab?.tableNumber ?? (fixedQr ? table.id : '')).trim()
   const tableLabel = String(table.tableLabel ?? mainTab?.tableLabel ?? (fixedQr && tableNumber ? `Mesa ${tableNumber}` : '')).trim()
   const tableId = Number(table.id) || Date.now()
+  const rawTabs = table.tabs?.length
+    ? table.tabs
+    : [createMainTableTab(tableId, {}, table.orderItems ?? [])]
+  const currentTabs = rawTabs.map((tab) => ({
+    ...tab,
+    orderItems: getCurrentOperationTableOrderItems(tab.orderItems ?? []),
+  }))
+  const currentTopOrderItems = getCurrentOperationTableOrderItems(table.orderItems ?? [])
+  const currentTabOrderItems = currentTabs.flatMap((tab) => tab.orderItems ?? [])
+  const currentOrderItems = currentTopOrderItems.length ? currentTopOrderItems : currentTabOrderItems
+  const hasCurrentItems = currentOrderItems.length > 0 || currentTabs.some((tab) => (tab.orderItems ?? []).length > 0)
+  const normalizedStatus = hasCurrentItems
+    ? (table.status === 'livre' ? 'ocupada' : table.status ?? 'ocupada')
+    : 'livre'
+  const normalizedTotal = currentOrderItems.reduce((total, item) => total + Number(item.total || 0), 0)
   const metadata = {
-    customerName: table.customerName ?? mainTab?.customerName ?? '',
-    customerPhone: table.customerPhone ?? mainTab?.customerPhone ?? '',
+    customerName: hasCurrentItems ? table.customerName ?? mainTab?.customerName ?? '' : '',
+    customerPhone: hasCurrentItems ? table.customerPhone ?? mainTab?.customerPhone ?? '' : '',
     tableNumber,
     tableLabel,
     dynamic: Boolean(table.dynamic),
@@ -1205,14 +1301,14 @@ function normalizeTableRecord(table) {
 
   return applyTableSessionMetadata({
     id: tableId,
-    guests: Number(table.guests || 0),
-    status: table.status ?? 'livre',
-    attendant: table.attendant ?? '-',
-    total: Number(table.total || 0),
-    orderItems: table.orderItems ?? mainTab?.orderItems ?? [],
-    tabs: table.tabs?.length
-      ? table.tabs
-      : [createMainTableTab(tableId, metadata, table.orderItems ?? [])],
+    guests: hasCurrentItems ? Number(table.guests || 0) : 0,
+    status: normalizedStatus,
+    attendant: hasCurrentItems ? table.attendant ?? '-' : '-',
+    total: normalizedTotal,
+    orderItems: currentOrderItems,
+    tabs: hasCurrentItems
+      ? currentTabs
+      : [createMainTableTab(tableId, metadata, [])],
     fixedQr,
   }, metadata)
 }
@@ -1296,14 +1392,24 @@ function findTableTabForClient(table, order) {
   const customerName = normalizeComparableText(order?.customerName)
   const customerPhone = normalizeComparableText(order?.phone)
   const sessionId = normalizeComparableText(order?.sessionId)
+  const sessionIdentity = normalizeComparableText(order?.sessionIdentity)
+  const tabs = getTableTabs(table)
 
-  return getTableTabs(table).find((tab) => {
+  if (sessionId) {
+    const exactSessionTab = tabs.find((tab) => normalizeComparableText(tab.sessionId) === sessionId)
+    if (exactSessionTab) return exactSessionTab
+  }
+
+  if (sessionIdentity) {
+    const exactIdentityTab = tabs.find((tab) => normalizeComparableText(tab.sessionIdentity) === sessionIdentity)
+    if (exactIdentityTab) return exactIdentityTab
+  }
+
+  return tabs.find((tab) => {
     const tabName = normalizeComparableText(tab.name ?? tab.customerName)
     const tabPhone = normalizeComparableText(tab.customerPhone ?? tab.phone)
-    const tabSessionId = normalizeComparableText(tab.sessionId)
 
     return (
-      (sessionId && tabSessionId === sessionId) ||
       (customerPhone && tabPhone === customerPhone) ||
       (customerName && tabName === customerName)
     )
@@ -1495,31 +1601,208 @@ function mergeProductMetadata(productsToNormalize = [], metadataProducts = []) {
   })
 }
 
-function mergeOfficialProducts(currentProducts = []) {
-  const customProducts = currentProducts.filter((product) => !products.some((defaultProduct) => defaultProduct.id === product.id))
+function normalizeCatalogText(value = '') {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
 
-  return [
-    ...products.map((product) => {
-      const currentProduct = currentProducts.find((item) => item.id === product.id)
+function isBeverageProduct(product = {}) {
+  const category = normalizeCatalogText(product.category)
+  return category === 'bebida' || category === 'bebidas'
+}
+
+function getSkuNumber(sku = '') {
+  const match = String(sku ?? '').match(/(\d+)/)
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER
+}
+
+function compareBeverageProducts(firstProduct, secondProduct) {
+  const firstSkuNumber = getSkuNumber(firstProduct?.sku)
+  const secondSkuNumber = getSkuNumber(secondProduct?.sku)
+  if (firstSkuNumber !== secondSkuNumber) return firstSkuNumber - secondSkuNumber
+
+  const firstId = Number(firstProduct?.id)
+  const secondId = Number(secondProduct?.id)
+  if (Number.isFinite(firstId) && Number.isFinite(secondId) && firstId !== secondId) return firstId - secondId
+
+  return String(firstProduct?.name ?? '').localeCompare(String(secondProduct?.name ?? ''), 'pt-BR')
+}
+
+function getProductDuplicateKey(product = {}) {
+  const category = normalizeCatalogText(product.category)
+  let name = normalizeCatalogText(product.name)
+
+  if (category === 'bebida' || category === 'bebidas') {
+    name = name
+      .replace(/\brefrigerante\b/g, '')
+      .replace(/\blata\b/g, '')
+      .replace(/\b350ml\b/g, '')
+      .replace(/\b330ml\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    const compactName = name.replace(/[^a-z0-9]/g, '')
+
+    if (compactName.includes('cocacolazero') || compactName.includes('cocacolazerosemacucar')) {
+      name = 'coca-cola-zero'
+    } else if (compactName.includes('cocacola')) {
+      name = 'coca-cola'
+    } else if (compactName.includes('guaranaantarcticazero')) {
+      name = 'guarana-antarctica-zero'
+    } else if (compactName.includes('guaranaantarctica')) {
+      name = 'guarana-antarctica'
+    } else if (compactName.includes('fantalaranja')) {
+      name = 'fanta-laranja'
+    } else if (compactName.includes('fantauva')) {
+      name = 'fanta-uva'
+    } else if (compactName.includes('sprite')) {
+      name = 'sprite'
+    } else if (compactName.includes('pepsi')) {
+      name = 'pepsi'
+    } else {
+      name = compactName || name
+    }
+  }
+
+  return `${category}:${name}`
+}
+
+function normalizeBeverageCatalog(productsToNormalize = []) {
+  const regularProducts = []
+  const beverageProducts = []
+
+  ;(Array.isArray(productsToNormalize) ? productsToNormalize : []).forEach((product) => {
+    if (isBeverageProduct(product)) {
+      beverageProducts.push(product)
+    } else {
+      regularProducts.push(product)
+    }
+  })
+
+  const seenBeverages = new Set()
+  const uniqueBeverages = beverageProducts
+    .sort(compareBeverageProducts)
+    .filter((product) => {
+      const duplicateKey = getProductDuplicateKey(product)
+      if (!duplicateKey || seenBeverages.has(duplicateKey)) return false
+      seenBeverages.add(duplicateKey)
+      return true
+    })
+    .map((product, index) => normalizeProduct({
+      ...product,
+      sku: `BEB-${String(index + 1).padStart(3, '0')}`,
+    }))
+
+  return [...regularProducts, ...uniqueBeverages]
+}
+
+function ensureProductsHaveTechnicalSheets(productList = [], sheetList = []) {
+  const safeProducts = Array.isArray(productList) ? productList : []
+  const safeSheets = Array.isArray(sheetList) ? sheetList : []
+  const nextSheets = safeSheets.map((sheet) => ({
+    ...sheet,
+    productId: Number(sheet.productId),
+    prepTime: Number(sheet.prepTime ?? 10),
+    yield: Number(sheet.yield ?? 1),
+    ingredients: Array.isArray(sheet.ingredients) ? sheet.ingredients : [],
+  }))
+  const usedSheetIds = new Set(nextSheets.map((sheet) => Number(sheet.id)).filter(Number.isFinite))
+  let nextSheetId = Math.max(0, ...Array.from(usedSheetIds)) + 1
+
+  const nextProducts = safeProducts.map((product) => {
+    const recipeId = Number(product.recipeId)
+    const linkedSheet = Number.isFinite(recipeId)
+      ? nextSheets.find((sheet) => Number(sheet.id) === recipeId)
+      : null
+
+    if (linkedSheet) return normalizeProduct(product)
+
+    const productId = Number(product.id)
+    const existingSheet = nextSheets.find((sheet) => Number(sheet.productId) === productId)
+    if (existingSheet) {
       return normalizeProduct({
         ...product,
+        recipeId: Number(existingSheet.id),
+      })
+    }
+
+    let sheetId = productId
+    if (!Number.isFinite(sheetId) || usedSheetIds.has(sheetId)) {
+      sheetId = nextSheetId
+      nextSheetId += 1
+    }
+
+    usedSheetIds.add(sheetId)
+    nextSheets.push({
+      id: sheetId,
+      productId,
+      prepTime: isBeverageProduct(product) ? 1 : 10,
+      yield: 1,
+      ingredients: [],
+    })
+
+    return normalizeProduct({
+      ...product,
+      recipeId: sheetId,
+    })
+  })
+
+  return {
+    products: nextProducts,
+    technicalSheets: nextSheets,
+  }
+}
+
+function mergeOfficialProducts(currentProducts = []) {
+  const safeCurrentProducts = Array.isArray(currentProducts) ? currentProducts : []
+  const customProducts = safeCurrentProducts.filter((product) =>
+    !products.some((defaultProduct) => Number(defaultProduct.id) === Number(product.id)),
+  )
+
+  const mergedProducts = [
+    ...products.map((product) => {
+      const currentProduct = safeCurrentProducts.find((item) => Number(item.id) === Number(product.id))
+      const mergedProduct = normalizeProduct({
+        ...product,
         ...(currentProduct ?? {}),
+        id: product.id,
         active: currentProduct?.active ?? product.active,
+      })
+
+      if (!isBeverageProduct(product)) return mergedProduct
+
+      return normalizeProduct({
+        ...mergedProduct,
+        sku: product.sku,
+        name: product.name,
+        category: product.category,
+        type: product.type,
+        description: product.description ?? mergedProduct.description,
+        recipeId: product.recipeId,
       })
     }),
     ...customProducts.map(normalizeProduct),
   ]
+
+  return normalizeBeverageCatalog(mergedProducts)
 }
 
 function mergeOfficialInventory(currentInventory = []) {
-  const customItems = currentInventory.filter((item) => !inventoryItems.some((defaultItem) => defaultItem.id === item.id))
+  const safeCurrentInventory = Array.isArray(currentInventory) ? currentInventory : []
+  const customItems = safeCurrentInventory.filter((item) =>
+    !inventoryItems.some((defaultItem) => Number(defaultItem.id) === Number(item.id)),
+  )
 
   return [
     ...inventoryItems.map((item) => {
-      const currentItem = currentInventory.find((current) => current.id === item.id)
+      const currentItem = safeCurrentInventory.find((current) => Number(current.id) === Number(item.id))
       return {
         ...item,
-        currentStock: currentItem?.currentStock ?? item.currentStock,
+        ...(currentItem ?? {}),
+        id: item.id,
       }
     }),
     ...customItems,
@@ -1527,27 +1810,60 @@ function mergeOfficialInventory(currentInventory = []) {
 }
 
 function mergeOfficialTechnicalSheets(currentSheets = []) {
-  const customSheets = currentSheets.filter((sheet) => !technicalSheets.some((defaultSheet) => defaultSheet.id === sheet.id))
+  const safeCurrentSheets = Array.isArray(currentSheets) ? currentSheets : []
+  const customSheets = safeCurrentSheets.filter((sheet) =>
+    !technicalSheets.some((defaultSheet) => Number(defaultSheet.id) === Number(sheet.id)),
+  )
 
-  return [...technicalSheets, ...customSheets]
+  return [
+    ...technicalSheets.map((defaultSheet) => {
+      const currentSheet = safeCurrentSheets.find((sheet) => Number(sheet.id) === Number(defaultSheet.id))
+      if (!currentSheet) return defaultSheet
+
+      return {
+        ...defaultSheet,
+        ...currentSheet,
+        id: defaultSheet.id,
+        productId: Number(currentSheet.productId ?? defaultSheet.productId),
+        prepTime: Number(currentSheet.prepTime ?? defaultSheet.prepTime),
+        yield: Number(currentSheet.yield ?? defaultSheet.yield),
+        ingredients: Array.isArray(currentSheet.ingredients)
+          ? currentSheet.ingredients.map((ingredient) => ({
+            inventoryItemId: Number(ingredient.inventoryItemId),
+            quantity: Number(ingredient.quantity || 0),
+          }))
+          : defaultSheet.ingredients,
+      }
+    }),
+    ...customSheets,
+  ]
 }
 
 function normalizeCatalogState(catalog = {}) {
+  const inventory = mergeOfficialInventory(catalog.inventory ?? [])
+  const products = mergeOfficialProducts(catalog.products ?? [])
+  const technicalSheets = mergeOfficialTechnicalSheets(catalog.technicalSheets ?? [])
+  const catalogWithSheets = ensureProductsHaveTechnicalSheets(products, technicalSheets)
+
   return {
-    inventory: mergeOfficialInventory(catalog.inventory ?? []),
-    products: mergeOfficialProducts(catalog.products ?? []),
-    technicalSheets: mergeOfficialTechnicalSheets(catalog.technicalSheets ?? []),
+    inventory,
+    products: catalogWithSheets.products,
+    technicalSheets: catalogWithSheets.technicalSheets,
   }
 }
 
 function normalizeAppState(state) {
+  const mergedProducts = mergeOfficialProducts(state.products ?? products)
+  const mergedTechnicalSheets = mergeOfficialTechnicalSheets(state.technicalSheets)
+  const catalogWithSheets = ensureProductsHaveTechnicalSheets(mergedProducts, mergedTechnicalSheets)
+
   return {
     ...state,
     inventory: mergeOfficialInventory(state.inventory),
-    technicalSheets: mergeOfficialTechnicalSheets(state.technicalSheets),
+    technicalSheets: catalogWithSheets.technicalSheets,
     tables: normalizeTablesState(state.tables),
     kitchen: (state.kitchen ?? []).map(normalizeKitchenOrder),
-    products: mergeOfficialProducts(state.products ?? products),
+    products: catalogWithSheets.products,
   }
 }
 
@@ -1569,6 +1885,28 @@ function getSyncRecordTime(record = {}) {
 
   const numericId = Number(String(record.id ?? '').match(/\d{10,}/)?.[0])
   return Number.isFinite(numericId) ? numericId : 0
+}
+
+function getOperationWindowStartTime(now = new Date()) {
+  const start = new Date(now)
+  start.setHours(4, 0, 0, 0)
+  if (now.getTime() < start.getTime()) start.setDate(start.getDate() - 1)
+  return start.getTime()
+}
+
+function isCurrentOperationRecord(record = {}) {
+  const createdTime = Date.parse(record.createdAt ?? record.submittedAt ?? '')
+  const recordTime = Number.isFinite(createdTime) && createdTime > 0
+    ? createdTime
+    : Number(String(record.id ?? '').match(/\d{10,}/)?.[0] ?? 0)
+  return recordTime >= getOperationWindowStartTime()
+}
+
+function filterCurrentOperationClientQrOrders(orders = []) {
+  return (Array.isArray(orders) ? orders : []).filter((order) => {
+    if (!order?.id) return false
+    return isCurrentOperationRecord(order)
+  })
 }
 
 function remoteCollectionLooksOlder(remoteItems = [], currentItems = []) {
@@ -1646,11 +1984,12 @@ export default function App({ icons, hooks }) {
   const [whatsAppInboxState, setWhatsAppInboxState] = hooks.useState(defaultAppState.whatsAppInbox ?? [])
   const [productsState, setProductsState] = hooks.useState(defaultAppState.products ?? products)
   const [purchaseOrdersState, setPurchaseOrdersState] = hooks.useState(defaultAppState.purchaseOrders)
-  const [clientQrOrdersState, setClientQrOrdersState] = hooks.useState(() => loadClientQrOrders())
+  const [clientQrOrdersState, setClientQrOrdersState] = hooks.useState(() => filterCurrentOperationClientQrOrders(loadClientQrOrders()))
   const [clientDeliveryOrdersState, setClientDeliveryOrdersState] = hooks.useState(() => loadClientDeliveryOrders())
   const [adminNotificationsState, setAdminNotificationsState] = hooks.useState(() => loadAdminNotifications().items)
   const notificationSeenKeysRef = useRef(loadSeenAdminNotificationKeys())
   const kitchenNotificationsPrimedRef = useRef(false)
+  const clientDeliveryRemoteHydratedRef = useRef(false)
 
   const navigation = hooks.useMemo(
     () => [
@@ -1722,10 +2061,10 @@ export default function App({ icons, hooks }) {
 
   hooks.useEffect(() => {
     const syncClientQrOrders = () => {
-      const storageOrders = loadClientQrOrders()
+      const storageOrders = filterCurrentOperationClientQrOrders(loadClientQrOrders())
 
       setClientQrOrdersState((currentOrders) => {
-        const nextOrders = mergeClientQrOrders(currentOrders, storageOrders)
+        const nextOrders = filterCurrentOperationClientQrOrders(mergeClientQrOrders(currentOrders, storageOrders))
         if (JSON.stringify(nextOrders) !== JSON.stringify(currentOrders)) saveClientQrOrders(nextOrders)
         return nextOrders
       })
@@ -1738,28 +2077,36 @@ export default function App({ icons, hooks }) {
       const remoteResult = await loadClientQrOrdersFromSupabase({ limit: 300 })
       if (!remoteResult.ok || !remoteResult.orders.length) return
 
-      const nextOrders = mergeAndSaveClientQrOrders(remoteResult.orders)
+      const nextOrders = filterCurrentOperationClientQrOrders(mergeAndSaveClientQrOrders(remoteResult.orders))
       setClientQrOrdersState(nextOrders)
     }
-    const intervalId = window.setInterval(syncClientQrOrders, 1500)
-    const remoteIntervalId = window.setInterval(syncRemoteClientQrOrders, 6000)
+    const intervalId = window.setInterval(syncClientQrOrders, localClientSyncIntervalMs)
+    const remoteIntervalId = window.setInterval(syncRemoteClientQrOrders, remoteClientSyncIntervalMs)
     const syncRequestTimeoutId = window.setTimeout(requestClientQrSync, 900)
-    const syncRequestIntervalId = window.setInterval(requestClientQrSync, 12000)
+    const syncRequestIntervalId = window.setInterval(requestClientQrSync, clientSyncRequestIntervalMs)
+    const handleClientQrWakeSync = () => {
+      syncClientQrOrders()
+      syncRemoteClientQrOrders()
+      requestClientQrSync()
+    }
+    const handleClientQrVisibilitySync = () => {
+      if (document.visibilityState === 'visible') handleClientQrWakeSync()
+    }
     syncRemoteClientQrOrders()
     const realtimeChannel = createClientQrBroadcastChannel({
       onOrder: (incomingOrder) => {
-        const nextOrders = mergeAndSaveClientQrOrders([incomingOrder])
+        const nextOrders = filterCurrentOperationClientQrOrders(mergeAndSaveClientQrOrders([incomingOrder]))
         setClientQrOrdersState(nextOrders)
       },
       onOrdersUpdated: (incomingOrders) => {
-        const nextOrders = mergeAndSaveClientQrOrders(incomingOrders)
+        const nextOrders = filterCurrentOperationClientQrOrders(mergeAndSaveClientQrOrders(incomingOrders))
         setClientQrOrdersState(nextOrders)
       },
       onSyncRequest: (payload = {}) => {
         const criteria = payload?.criteria ?? payload ?? {}
         const requestedTable = String(criteria.tableNumber ?? '').trim()
         const requestedSessionIdentity = String(criteria.sessionIdentity ?? '').trim()
-        const currentOrders = loadClientQrOrders().filter((order) => {
+        const currentOrders = filterCurrentOperationClientQrOrders(loadClientQrOrders()).filter((order) => {
           if (requestedTable && String(order?.tableNumber ?? '').trim() !== requestedTable) return false
           if (requestedSessionIdentity && String(order?.sessionIdentity ?? '').trim() !== requestedSessionIdentity) return false
           return true
@@ -1768,11 +2115,13 @@ export default function App({ icons, hooks }) {
       },
     })
     const remoteChannel = subscribeToClientQrOrdersFromSupabase((incomingOrder) => {
-      const nextOrders = mergeAndSaveClientQrOrders([incomingOrder])
+      const nextOrders = filterCurrentOperationClientQrOrders(mergeAndSaveClientQrOrders([incomingOrder]))
       setClientQrOrdersState(nextOrders)
     })
 
     window.addEventListener('storage', syncClientQrOrders)
+    window.addEventListener('focus', handleClientQrWakeSync)
+    document.addEventListener('visibilitychange', handleClientQrVisibilitySync)
     window.addEventListener('loccoburger:client-qr-orders-updated', syncClientQrOrders)
 
     return () => {
@@ -1783,20 +2132,53 @@ export default function App({ icons, hooks }) {
       closeClientQrBroadcastChannel(realtimeChannel)
       closeClientQrOrdersSupabaseSubscription(remoteChannel)
       window.removeEventListener('storage', syncClientQrOrders)
+      window.removeEventListener('focus', handleClientQrWakeSync)
+      document.removeEventListener('visibilitychange', handleClientQrVisibilitySync)
       window.removeEventListener('loccoburger:client-qr-orders-updated', syncClientQrOrders)
     }
   }, [])
 
   hooks.useEffect(() => {
-    const syncClientDeliveryOrders = () => setClientDeliveryOrdersState(loadClientDeliveryOrders())
-    const intervalId = window.setInterval(syncClientDeliveryOrders, 1500)
+    const syncClientDeliveryOrders = () => {
+      if (clientDeliveryRemoteHydratedRef.current) return
+      setClientDeliveryOrdersState(loadClientDeliveryOrders())
+    }
+    const syncRemoteClientDeliveryOrders = async () => {
+      const remoteResult = await loadClientDeliveryOrdersFromSupabase({ limit: 300 })
+      if (!remoteResult.ok) return
+
+      clientDeliveryRemoteHydratedRef.current = true
+      const nextOrders = saveClientDeliveryOrders(remoteResult.orders)
+      setClientDeliveryOrdersState(nextOrders)
+    }
+    const intervalId = window.setInterval(syncClientDeliveryOrders, localClientSyncIntervalMs)
+    const remoteIntervalId = window.setInterval(syncRemoteClientDeliveryOrders, remoteClientSyncIntervalMs)
+    const handleClientDeliveryWakeSync = () => {
+      syncClientDeliveryOrders()
+      syncRemoteClientDeliveryOrders()
+    }
+    const handleClientDeliveryVisibilitySync = () => {
+      if (document.visibilityState === 'visible') handleClientDeliveryWakeSync()
+    }
+    syncRemoteClientDeliveryOrders()
+    const remoteChannel = subscribeToClientDeliveryOrdersFromSupabase((incomingOrder) => {
+      clientDeliveryRemoteHydratedRef.current = true
+      const nextOrders = mergeAndSaveClientDeliveryOrders([incomingOrder])
+      setClientDeliveryOrdersState(nextOrders)
+    })
 
     window.addEventListener('storage', syncClientDeliveryOrders)
+    window.addEventListener('focus', handleClientDeliveryWakeSync)
+    document.addEventListener('visibilitychange', handleClientDeliveryVisibilitySync)
     window.addEventListener('loccoburger:client-delivery-orders-updated', syncClientDeliveryOrders)
 
     return () => {
       window.clearInterval(intervalId)
+      window.clearInterval(remoteIntervalId)
+      closeClientDeliveryOrdersSupabaseSubscription(remoteChannel)
       window.removeEventListener('storage', syncClientDeliveryOrders)
+      window.removeEventListener('focus', handleClientDeliveryWakeSync)
+      document.removeEventListener('visibilitychange', handleClientDeliveryVisibilitySync)
       window.removeEventListener('loccoburger:client-delivery-orders-updated', syncClientDeliveryOrders)
     }
   }, [])
@@ -1858,6 +2240,38 @@ export default function App({ icons, hooks }) {
     }
   }, [clientDeliveryOrdersState, deliveryState])
 
+  function playAdminNotificationSound() {
+    if (typeof window === 'undefined') return
+
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextConstructor) return
+
+    try {
+      const audioContext = new AudioContextConstructor()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      const now = audioContext.currentTime
+
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(880, now)
+      oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.12)
+      gainNode.gain.setValueAtTime(0.0001, now)
+      gainNode.gain.exponentialRampToValueAtTime(0.12, now + 0.02)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.22)
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      oscillator.start(now)
+      oscillator.stop(now + 0.24)
+
+      window.setTimeout(() => {
+        audioContext.close?.().catch?.(() => {})
+      }, 350)
+    } catch {
+      // Alguns navegadores bloqueiam audio antes do primeiro toque/click do usuario.
+    }
+  }
+
   function pushAdminNotification(notification) {
     const notificationKey = notification.key ?? notification.id
     if (!notificationKey || notificationSeenKeysRef.current.includes(notificationKey)) return
@@ -1876,11 +2290,49 @@ export default function App({ icons, hooks }) {
       saveAdminNotifications(nextNotifications)
       return nextNotifications
     })
+
+    playAdminNotificationSound()
+  }
+
+  function getCurrentAdminNotificationKeys() {
+    const activeQrKeys = clientQrOrdersState
+      .filter((order) => order.status === 'novo')
+      .map((order) => `qr:${order.id}`)
+
+    const activeDeliveryKeys = clientDeliveryOrdersState
+      .filter((order) => order.status === 'novo')
+      .map((order) => `delivery:${order.id}`)
+
+    const activeKitchenKeys = kitchenState
+      .filter((order) => order.status === 'em preparo')
+      .map((order) => `kitchen:${order.id}`)
+
+    const visibleNotificationKeys = adminNotificationsState
+      .map((notification) => notification.key ?? notification.id)
+      .filter(Boolean)
+
+    return Array.from(new Set([
+      ...visibleNotificationKeys,
+      ...activeQrKeys,
+      ...activeDeliveryKeys,
+      ...activeKitchenKeys,
+    ]))
+  }
+
+  function clearCurrentAdminNotifications() {
+    const ignoredKeys = getCurrentAdminNotificationKeys()
+    notificationSeenKeysRef.current = saveSeenAdminNotificationKeys([
+      ...ignoredKeys,
+      ...notificationSeenKeysRef.current,
+    ])
+
+    const payload = clearAdminNotifications()
+    setAdminNotificationsState(payload.items)
+    return payload
   }
 
   function handleClearAdminNotifications() {
-    const payload = clearAdminNotifications()
-    setAdminNotificationsState(payload.items)
+    clearCurrentAdminNotifications()
     return { ok: true, message: 'Notificacoes limpas.' }
   }
 
@@ -2569,14 +3021,31 @@ export default function App({ icons, hooks }) {
   hooks.useEffect(() => {
     if (!currentUser || !dataReady) return undefined
 
+    const handleWakeSync = () => {
+      refreshSharedDataFromSupabase()
+    }
+    const handleVisibilitySync = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSharedDataFromSupabase()
+      }
+    }
+
     const intervalId = window.setInterval(() => {
       refreshSharedDataFromSupabase()
     }, remoteSyncIntervalMs)
 
-    return () => window.clearInterval(intervalId)
+    window.addEventListener('focus', handleWakeSync)
+    document.addEventListener('visibilitychange', handleVisibilitySync)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleWakeSync)
+      document.removeEventListener('visibilitychange', handleVisibilitySync)
+    }
   }, [currentUser, dataReady])
 
   async function handleResetData() {
+    clearCurrentAdminNotifications()
     clearAppState()
     const currentState = getCurrentAppState()
     const cleanState = {
@@ -2603,6 +3072,7 @@ export default function App({ icons, hooks }) {
   }
 
   async function handleResetOperationData() {
+    clearCurrentAdminNotifications()
     const currentState = getCurrentAppState()
     const cleanState = {
       ...currentState,
@@ -2634,24 +3104,6 @@ export default function App({ icons, hooks }) {
       cleanState,
       'Financeiro limpo. Faturamento, lucro, DRE, recebiveis e fechamentos foram zerados.',
       { activePage: 'financeiro' },
-    )
-  }
-
-  async function handleResetInventoryStock() {
-    const currentState = getCurrentAppState()
-    const cleanState = {
-      ...currentState,
-      inventory: currentState.inventory.map((item) => ({
-        ...item,
-        currentStock: 0,
-      })),
-      stockAdjustments: [],
-    }
-
-    return persistMaintenanceState(
-      cleanState,
-      'Estoque zerado. Os insumos continuam cadastrados, mas todas as quantidades ficaram em 0.',
-      { activePage: 'estoque' },
     )
   }
 
@@ -2730,78 +3182,152 @@ export default function App({ icons, hooks }) {
 
   async function handleSaveInventoryItem(item) {
     const currentState = appStateRef.current ?? getCurrentAppState()
-    const nextInventory = saveInventoryItem({ currentItems: currentState.inventory ?? inventoryState, item })
+    const currentInventory = currentState.inventory ?? inventoryState
+    const nextInventory = saveInventoryItem({ currentItems: currentInventory, item })
+    const itemId = item.id ? Number(item.id) : null
+    const savedItem = itemId
+      ? nextInventory.find((inventoryItem) => Number(inventoryItem.id) === itemId)
+      : nextInventory.find((inventoryItem) => inventoryItem.name === item.name?.trim())
+
+    if (nextInventory === currentInventory || !savedItem) {
+      return { ok: false, message: 'Nao foi possivel salvar este insumo. Confira nome, categoria, unidade, minimo e custo.' }
+    }
+
     const nextState = {
       ...currentState,
       inventory: nextInventory,
     }
 
-    return persistMaintenanceState(nextState, `${item.name} salvo no estoque.`)
+    return persistMaintenanceState(nextState, `${item.name} salvo no estoque.`, { activePage: 'estoque' })
   }
 
   function handleStockEntry(entry) {
-    setInventoryState((currentItems) =>
-      currentItems.map((item) => (item.id === entry.inventoryItemId ? applyStockEntry(item, entry) : item)),
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const nextInventory = (currentState.inventory ?? inventoryState).map((item) =>
+      item.id === entry.inventoryItemId ? applyStockEntry(item, entry) : item,
+    )
+
+    void persistMaintenanceState(
+      {
+        ...currentState,
+        inventory: nextInventory,
+      },
+      'Entrada de estoque salva.',
     )
   }
 
   function handleStockAdjustment(adjustment) {
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentInventory = currentState.inventory ?? inventoryState
+    const currentAdjustments = currentState.stockAdjustments ?? stockAdjustmentsState
     const newAdjustment = createStockAdjustment({
       adjustment,
-      currentAdjustments: stockAdjustmentsState,
-      inventoryItems: inventoryState,
+      currentAdjustments,
+      inventoryItems: currentInventory,
     })
     if (!newAdjustment) return null
 
-    setInventoryState((currentItems) =>
-      currentItems.map((item) =>
-        item.id === newAdjustment.inventoryItemId ? applyStockAdjustment(item, newAdjustment) : item,
-      ),
+    const nextInventory = currentInventory.map((item) =>
+      item.id === newAdjustment.inventoryItemId ? applyStockAdjustment(item, newAdjustment) : item,
     )
-    setStockAdjustmentsState((currentAdjustments) => [newAdjustment, ...currentAdjustments])
+    const nextAdjustments = [newAdjustment, ...currentAdjustments]
+
+    void persistMaintenanceState(
+      {
+        ...currentState,
+        inventory: nextInventory,
+        stockAdjustments: nextAdjustments,
+      },
+      `${newAdjustment.code} registrado no estoque.`,
+    )
+
     return newAdjustment
   }
 
   function handleCreatePurchaseOrder(order) {
-    const newOrder = createPurchaseOrder({ currentOrders: purchaseOrdersState, inventoryItems: inventoryState, order })
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentOrders = currentState.purchaseOrders ?? purchaseOrdersState
+    const newOrder = createPurchaseOrder({
+      currentOrders,
+      inventoryItems: currentState.inventory ?? inventoryState,
+      order,
+    })
     if (!newOrder) return null
 
-    setPurchaseOrdersState((currentOrders) => [newOrder, ...currentOrders])
+    void persistMaintenanceState(
+      {
+        ...currentState,
+        purchaseOrders: [newOrder, ...currentOrders],
+      },
+      `${newOrder.code} criado para ${newOrder.itemName}.`,
+    )
+
     return newOrder
   }
 
   function handleReceivePurchaseOrder(orderId) {
-    const order = purchaseOrdersState.find((item) => item.id === orderId)
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentOrders = currentState.purchaseOrders ?? purchaseOrdersState
+    const currentInventory = currentState.inventory ?? inventoryState
+    const order = currentOrders.find((item) => item.id === orderId)
     const receipt = receivePurchaseOrder(order)
     if (!receipt) return
 
-    handleStockEntry(receipt.stockEntry)
+    const nextInventory = currentInventory.map((item) =>
+      item.id === receipt.stockEntry.inventoryItemId ? applyStockEntry(item, receipt.stockEntry) : item,
+    )
+    const nextOrders = currentOrders.map((item) => (item.id === orderId ? receipt.receivedOrder : item))
 
-    setPurchaseOrdersState((currentOrders) =>
-      currentOrders.map((item) => (item.id === orderId ? receipt.receivedOrder : item)),
+    void persistMaintenanceState(
+      {
+        ...currentState,
+        inventory: nextInventory,
+        purchaseOrders: nextOrders,
+      },
+      `${receipt.receivedOrder.code} recebido e estoque atualizado.`,
     )
   }
 
   function handleCancelPurchaseOrder(orderId) {
-    setPurchaseOrdersState((currentOrders) =>
-      currentOrders.filter((order) => !(order.id === orderId && order.status === 'aberto')),
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentOrders = currentState.purchaseOrders ?? purchaseOrdersState
+    const nextOrders = currentOrders.filter((order) => !(order.id === orderId && order.status === 'aberto'))
+
+    void persistMaintenanceState(
+      {
+        ...currentState,
+        purchaseOrders: nextOrders,
+      },
+      'Pedido de compra cancelado.',
     )
   }
 
   function handleImportFiscalCoupon(importData) {
-    importData.items.forEach((item) => {
-      handleStockEntry({
+    const currentState = appStateRef.current ?? getCurrentAppState()
+    const currentInventory = currentState.inventory ?? inventoryState
+    const currentOrders = currentState.purchaseOrders ?? purchaseOrdersState
+    const nextInventory = importData.items.reduce((inventory, item) => {
+      const stockEntry = {
         inventoryItemId: item.inventoryItemId,
         quantity: item.quantity,
         unitCost: item.unitCost,
         supplier: importData.supplier,
-      })
-    })
+      }
 
-    setPurchaseOrdersState((currentOrders) => [
-      createFiscalCouponReceipt({ currentOrders, importData }),
-      ...currentOrders,
-    ])
+      return inventory.map((inventoryItem) =>
+        inventoryItem.id === stockEntry.inventoryItemId ? applyStockEntry(inventoryItem, stockEntry) : inventoryItem,
+      )
+    }, currentInventory)
+    const fiscalReceipt = createFiscalCouponReceipt({ currentOrders, importData })
+
+    void persistMaintenanceState(
+      {
+        ...currentState,
+        inventory: nextInventory,
+        purchaseOrders: [fiscalReceipt, ...currentOrders],
+      },
+      'Entrada do cupom fiscal salva no estoque.',
+    )
   }
 
   async function handleAddIngredient(sheetId, ingredient) {
@@ -3052,12 +3578,14 @@ export default function App({ icons, hooks }) {
     const guestLabel = String(guestPayload.name ?? '').trim()
     const guestPhone = String(guestPayload.phone ?? '').trim()
     const guestSessionId = String(guestPayload.sessionId ?? '').trim()
+    const guestSessionIdentity = String(guestPayload.sessionIdentity ?? '').trim()
     const newTab = {
       id: `${tableId}-${Date.now()}`,
       name: guestLabel,
       customerName: guestLabel,
       customerPhone: guestPhone,
       sessionId: guestSessionId,
+      sessionIdentity: guestSessionIdentity,
       orderItems: [],
     }
 
@@ -3403,12 +3931,24 @@ export default function App({ icons, hooks }) {
 
       if (!targetTab) {
         markClientQrOrder(orderId, {
-          status: 'aprovado',
+          status: 'fechado',
           processedAt: new Date().toISOString(),
-          adminMessage: `Fechamento recebido, mas ${order.customerName} nao tem consumo aberto nesta mesa.`,
+          adminMessage: `Fechamento recebido, mas ${order.customerName} nao tem consumo aberto nesta mesa. Comanda liberada.`,
         })
 
-        return { ok: true, message: `${order.customerName} nao tem consumo aberto para enviar ao caixa.` }
+        return { ok: true, message: `${order.customerName} nao tem consumo aberto. Comanda liberada.` }
+      }
+
+      const targetTotal = getTableTabTotal(targetTab)
+      if (targetTotal <= 0) {
+        markClientQrOrder(orderId, {
+          status: 'fechado',
+          tabId: targetTab.id,
+          processedAt: new Date().toISOString(),
+          adminMessage: `Fechamento recebido, mas ${order.customerName} esta sem consumo em aberto. Comanda liberada.`,
+        })
+
+        return { ok: true, message: `${order.customerName} esta sem consumo em aberto. Comanda liberada.` }
       }
 
       const closeResult = handleRequestTableClose(tableForClose.id, {
@@ -3433,18 +3973,25 @@ export default function App({ icons, hooks }) {
       name: order.customerName,
       phone: order.phone,
       sessionId: order.sessionId,
+      sessionIdentity: order.sessionIdentity,
     })
     const tableAfterGuest = (appStateRef.current?.tables ?? tablesState).find((item) => item.id === latestTable.id) ?? latestTable
+    const tableAfterGuestTabs = getTableTabs(tableAfterGuest)
+    const hasClientTabInSnapshot = clientTab && tableAfterGuestTabs.some((tab) => tab.id === clientTab.id)
+    const snapshotTabs = clientTab && !hasClientTabInSnapshot
+      ? [...tableAfterGuestTabs, clientTab]
+      : tableAfterGuestTabs
     const tabId = clientTab?.id ?? `${latestTable.id}-mesa`
-    const tableSnapshot = existingClientTab
-      ? latestTable
-      : {
-          ...tableAfterGuest,
-          status: tableAfterGuest.status === 'livre' ? 'ocupada' : tableAfterGuest.status,
-          guests: getTableTabs(tableAfterGuest).filter((tab) => tab.name !== 'Mesa').length,
-          attendant: tableAfterGuest.attendant === '-' ? 'QR Code' : tableAfterGuest.attendant,
-          tabs: getTableTabs(tableAfterGuest),
-        }
+    const tableSnapshot = {
+      ...tableAfterGuest,
+      status: tableAfterGuest.status === 'livre' ? 'ocupada' : tableAfterGuest.status,
+      guests: Math.max(
+        Number(tableAfterGuest.guests || 0),
+        snapshotTabs.filter((tab) => tab.name !== 'Mesa').length,
+      ),
+      attendant: tableAfterGuest.attendant === '-' ? 'QR Code' : tableAfterGuest.attendant,
+      tabs: snapshotTabs,
+    }
 
     if (!options.forceStock) {
       const stockIssue = (order.items ?? [])
@@ -3467,10 +4014,15 @@ export default function App({ icons, hooks }) {
     }
 
     for (const item of order.items ?? []) {
-      const result = await handleAddTableItem(latestTable.id, Number(item.productId), Number(item.quantity), tabId, item.notes ?? order.notes ?? '', {
+      const itemNotes = item.manualNotes ?? item.notes ?? order.notes ?? ''
+      const result = await handleAddTableItem(latestTable.id, Number(item.productId), Number(item.quantity), tabId, itemNotes, {
         forceStock: Boolean(options.forceStock),
-        manualNotes: order.notes ?? '',
+        manualNotes: itemNotes,
         modifiers: item.modifiers ?? null,
+        sessionId: order.sessionId ?? null,
+        sessionIdentity: order.sessionIdentity ?? null,
+        sourceOrderId: order.id,
+        submittedAt: order.createdAt ?? order.submittedAt ?? new Date().toISOString(),
         tableSnapshot,
         unitPrice: Number(item.unitPrice || 0),
       })
@@ -3501,7 +4053,7 @@ export default function App({ icons, hooks }) {
     const updatedOrder = markClientQrOrder(orderId, {
       status: 'recusado',
       processedAt: new Date().toISOString(),
-      adminMessage: 'Pedido recusado pelo atendimento.',
+      adminMessage: 'Pedido recusado pelo atendimento. Confira os itens e envie novamente se desejar.',
     })
 
     if (!updatedOrder) return { ok: false, message: 'Pedido QR nao encontrado.' }
@@ -3583,9 +4135,11 @@ export default function App({ icons, hooks }) {
     const product = productsState.find((item) => item.id === productId)
     const sheet = technicalSheetsState.find((item) => item.id === product?.recipeId)
 
-    if (!product || !sheet) return null
+    if (!product) return null
 
     const ticketId = kitchenTicketId ?? `#P-${Date.now()}-${productId}`
+    const category = String(product.category ?? '').toLowerCase()
+    const fallbackTargetMinutes = category.includes('bebida') ? 1 : category.includes('porcao') ? 8 : 12
 
     return {
       id: ticketId,
@@ -3601,7 +4155,7 @@ export default function App({ icons, hooks }) {
       finalizedAt: null,
       completedAt: null,
       deliveredAt: null,
-      targetMinutes: sheet.prepTime,
+      targetMinutes: Number(sheet?.prepTime || fallbackTargetMinutes),
     }
   }
 
@@ -3623,7 +4177,6 @@ export default function App({ icons, hooks }) {
     const currentProducts = currentState.products ?? productsState
     const currentTechnicalSheets = currentState.technicalSheets ?? technicalSheetsState
     const product = currentProducts.find((item) => item.id === productId)
-    const sheet = currentTechnicalSheets.find((item) => item.id === product?.recipeId)
     const tableFromState = currentTables.find((item) => item.id === tableId)
     const tableSnapshot = options.tableSnapshot ?? null
     const stateHasTargetTab = tableFromState && (!tabId || getTableTabs(tableFromState).some((tab) => tab.id === tabId))
@@ -3637,13 +4190,14 @@ export default function App({ icons, hooks }) {
       technicalSheets: currentTechnicalSheets,
     })
 
-    if (!product || !sheet || !table || quantity <= 0) return { ok: false, message: 'Nao foi possivel lancar este item.' }
+    if (!product || !table || quantity <= 0) return { ok: false, message: 'Nao foi possivel lancar este item.' }
     if (!stockAvailability.available && !options.forceStock) {
       return { ok: false, needsOverride: true, message: stockAvailability.message }
     }
 
     const unitPrice = Number(options.unitPrice ?? product.price)
     const now = Date.now()
+    const nowIso = new Date(now).toISOString()
     const orderItemId = `${now}-${productId}-${Math.random().toString(16).slice(2, 8)}`
     const kitchenTicketId = `#P-${now}-${productId}`
     const orderItem = {
@@ -3657,6 +4211,11 @@ export default function App({ icons, hooks }) {
       kitchenTicketId,
       notes: notes.trim(),
       modifiers: options.modifiers ?? null,
+      createdAt: nowIso,
+      submittedAt: options.submittedAt ?? options.sourceSubmittedAt ?? nowIso,
+      sourceOrderId: options.sourceOrderId ?? null,
+      sessionId: options.sessionId ?? null,
+      sessionIdentity: options.sessionIdentity ?? null,
     }
     const tableSource = getTableSessionLabel(table)
     const ticket = buildKitchenTicket({
@@ -4457,6 +5016,7 @@ export default function App({ icons, hooks }) {
   function markClientDeliveryOrder(orderId, patch) {
     const updatedOrder = updateClientDeliveryOrder(orderId, patch)
     setClientDeliveryOrdersState(loadClientDeliveryOrders())
+    if (updatedOrder) saveClientDeliveryOrderToSupabase(updatedOrder).catch(() => {})
     return updatedOrder
   }
 
@@ -4864,7 +5424,6 @@ export default function App({ icons, hooks }) {
     estoque: (
       <Inventory
         inventoryItems={inventoryState}
-        onResetInventory={handleResetInventoryStock}
         onSaveInventoryItem={handleSaveInventoryItem}
         onStockAdjustment={handleStockAdjustment}
         onStockEntry={handleStockEntry}
@@ -4974,10 +5533,7 @@ export default function App({ icons, hooks }) {
       icons={icons}
       notifications={adminNotificationsState}
       onClearNotifications={handleClearAdminNotifications}
-      onResetData={handleResetData}
       onResetFinancialData={handleResetFinancialData}
-      onResetInventoryStock={handleResetInventoryStock}
-      onResetOperationData={handleResetOperationData}
       onLogout={handleLogout}
       repositoryStatus={repositoryStatus}
       syncStatus={syncStatus}

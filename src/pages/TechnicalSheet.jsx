@@ -1,7 +1,12 @@
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
 import { useState } from 'react'
-import { getInventoryItem, getRecipeCost, getRecipeUnitCost } from '../lib/technicalSheetRepository.js'
+import {
+  getInventoryItem,
+  getRecipeCost,
+  getRecipeStockCapacity,
+  getRecipeUnitCost,
+} from '../lib/technicalSheetRepository.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const number = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 4 })
@@ -18,6 +23,46 @@ function getIngredientQuantityHint(item) {
   return `Quantidade em ${item.unit}. Aceita fracao, como 0,5 ou 0,02.`
 }
 
+function normalizeSearchText(value = '') {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function getProductSkuNumber(sku = '') {
+  const match = String(sku).match(/(\d+)/)
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER
+}
+
+function compareProducts(firstProduct = {}, secondProduct = {}) {
+  const firstCategory = String(firstProduct?.category ?? '')
+  const secondCategory = String(secondProduct?.category ?? '')
+  if (firstCategory !== secondCategory) return firstCategory.localeCompare(secondCategory, 'pt-BR')
+
+  const firstSkuPrefix = String(firstProduct?.sku ?? '').split('-')[0]
+  const secondSkuPrefix = String(secondProduct?.sku ?? '').split('-')[0]
+  if (firstSkuPrefix !== secondSkuPrefix) return firstSkuPrefix.localeCompare(secondSkuPrefix, 'pt-BR')
+
+  const skuDifference = getProductSkuNumber(firstProduct?.sku) - getProductSkuNumber(secondProduct?.sku)
+  if (skuDifference !== 0) return skuDifference
+
+  return String(firstProduct?.name ?? '').localeCompare(String(secondProduct?.name ?? ''), 'pt-BR')
+}
+
+function matchesProductSearch(product, searchTerm) {
+  if (!searchTerm) return true
+
+  return [
+    product?.name,
+    product?.sku,
+    product?.category,
+    product?.type,
+    product?.description,
+  ].some((field) => normalizeSearchText(field).includes(searchTerm))
+}
+
 export function TechnicalSheet({
   inventoryItems,
   onAddIngredient,
@@ -32,7 +77,30 @@ export function TechnicalSheet({
   const [sheetForms, setSheetForms] = useState({})
   const [savingAction, setSavingAction] = useState(null)
   const [sheetMessage, setSheetMessage] = useState(null)
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
+  const [sheetSearch, setSheetSearch] = useState('')
+  const [collapsedSheets, setCollapsedSheets] = useState({})
+  const sheetCategories = Array.from(
+    new Set(products.map((product) => product.category).filter(Boolean)),
+  ).sort((firstCategory, secondCategory) => firstCategory.localeCompare(secondCategory, 'pt-BR'))
+  const sheetSearchTerm = normalizeSearchText(sheetSearch)
   const productsWithoutSheet = products.filter((product) => !product.recipeId)
+  const filteredProductsWithoutSheet = productsWithoutSheet
+    .filter((product) => categoryFilter === 'Todas' || product.category === categoryFilter)
+    .filter((product) => matchesProductSearch(product, sheetSearchTerm))
+    .sort(compareProducts)
+  const visibleTechnicalSheets = technicalSheets
+    .filter((sheet) => {
+      const product = products.find((item) => item.id === sheet.productId)
+      return product
+        && (categoryFilter === 'Todas' || product.category === categoryFilter)
+        && matchesProductSearch(product, sheetSearchTerm)
+    })
+    .sort((firstSheet, secondSheet) => {
+      const firstProduct = products.find((item) => item.id === firstSheet.productId)
+      const secondProduct = products.find((item) => item.id === secondSheet.productId)
+      return compareProducts(firstProduct, secondProduct)
+    })
 
   function getForm(sheet) {
     return ingredientForms[sheet.id] ?? {
@@ -202,22 +270,82 @@ export function TechnicalSheet({
     }
   }
 
+  function toggleSheetCollapsed(sheetId) {
+    setCollapsedSheets((currentSheets) => ({
+      ...currentSheets,
+      [sheetId]: !currentSheets[sheetId],
+    }))
+  }
+
+  function setAllSheetsCollapsed(collapsed) {
+    const nextSheets = {}
+    visibleTechnicalSheets.forEach((sheet) => {
+      nextSheets[sheet.id] = collapsed
+    })
+    setCollapsedSheets((currentSheets) => ({
+      ...currentSheets,
+      ...nextSheets,
+    }))
+  }
+
   return (
     <div className="recipe-grid">
-      {productsWithoutSheet.length > 0 && (
+      <Card className="wide-card compact-filter-card">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Filtro</p>
+            <h2>Ficha tecnica por categoria</h2>
+          </div>
+          <span className="soft-label">
+            {visibleTechnicalSheets.length} ficha(s)
+          </span>
+        </div>
+        <div className="admin-filter-strip">
+          <label className="admin-filter-field">
+            Filtrar categoria
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="Todas">Todas as categorias</option>
+              {sheetCategories.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-filter-field admin-filter-field-wide">
+            Buscar ficha
+            <input
+              value={sheetSearch}
+              onChange={(event) => setSheetSearch(event.target.value)}
+              placeholder="Nome do produto, codigo ou categoria"
+            />
+          </label>
+          <div className="admin-filter-actions">
+            <button className="secondary-button" type="button" onClick={() => setAllSheetsCollapsed(true)}>
+              Recolher todas
+            </button>
+            <button className="ghost-button" type="button" onClick={() => setAllSheetsCollapsed(false)}>
+              Abrir todas
+            </button>
+          </div>
+          <span className="filter-result-pill">
+            {visibleTechnicalSheets.length} de {technicalSheets.length} ficha(s)
+          </span>
+        </div>
+      </Card>
+
+      {filteredProductsWithoutSheet.length > 0 && (
         <Card className="wide-card">
           <div className="section-heading">
             <div>
               <p className="eyebrow">Pendencias</p>
               <h2>Produtos sem ficha tecnica</h2>
             </div>
-            <span className="soft-label">{productsWithoutSheet.length} produtos</span>
+            <span className="soft-label">{filteredProductsWithoutSheet.length} produtos</span>
           </div>
           {sheetMessage?.sheetId === 'new' && (
             <div className={sheetMessage.ok ? 'form-hint' : 'form-alert'}>{sheetMessage.text}</div>
           )}
           <div className="list-stack">
-            {productsWithoutSheet.map((product) => (
+            {filteredProductsWithoutSheet.map((product) => (
               <div className="list-row" key={product.id}>
                 <div>
                   <strong>{product.name}</strong>
@@ -237,36 +365,77 @@ export function TechnicalSheet({
         </Card>
       )}
 
-      {technicalSheets.map((sheet) => {
+      {visibleTechnicalSheets.map((sheet) => {
         const product = products.find((item) => item.id === sheet.productId)
         if (!product) return null
         const cost = getRecipeCost(sheet, inventoryItems)
         const unitCost = getRecipeUnitCost(sheet, inventoryItems)
+        const stockCapacity = getRecipeStockCapacity(sheet, inventoryItems)
         const contribution = product.price - unitCost
         const margin = product.price ? (contribution / product.price) * 100 : 0
         const form = getForm(sheet)
         const sheetForm = getSheetForm(sheet)
         const selectedIngredientItem = inventoryItems.find((item) => item.id === Number(form.inventoryItemId))
+        const isCollapsed = Boolean(collapsedSheets[sheet.id])
+        const cardHeading = (
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">{product.category}</p>
+              <h2>{product.name}</h2>
+            </div>
+            <div className="recipe-heading-actions">
+              <StatusBadge status={product.active ? 'com-ficha' : 'inativo'} />
+              <button className="ghost-button" type="button" onClick={() => toggleSheetCollapsed(sheet.id)}>
+                {isCollapsed ? 'Abrir ficha' : 'Recolher'}
+              </button>
+              <button
+                className="ghost-button danger-button"
+                disabled={savingAction === `delete-${sheet.id}`}
+                type="button"
+                onClick={() => handleDeleteSheet(sheet, product)}
+              >
+                {savingAction === `delete-${sheet.id}` ? 'Excluindo...' : 'Excluir ficha'}
+              </button>
+            </div>
+          </div>
+        )
+
+        if (isCollapsed) {
+          return (
+            <Card className="recipe-card recipe-card-collapsed" key={sheet.id}>
+              {cardHeading}
+              {sheetMessage?.sheetId === sheet.id && (
+                <div className={sheetMessage.ok ? 'form-hint' : 'form-alert'}>{sheetMessage.text}</div>
+              )}
+              <div className="recipe-collapsed-summary">
+                <div>
+                  <span>Venda</span>
+                  <strong>{currency.format(product.price)}</strong>
+                </div>
+                <div>
+                  <span>Custo</span>
+                  <strong>{currency.format(unitCost)}</strong>
+                </div>
+                <div>
+                  <span>Margem</span>
+                  <strong>{margin.toFixed(1)}%</strong>
+                </div>
+                <div>
+                  <span>Insumos</span>
+                  <strong>{sheet.ingredients.length}</strong>
+                </div>
+                <div>
+                  <span>Da para fazer</span>
+                  <strong>{stockCapacity.capacity} un</strong>
+                </div>
+              </div>
+            </Card>
+          )
+        }
 
         return (
           <Card className="recipe-card" key={sheet.id}>
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">{product.category}</p>
-                <h2>{product.name}</h2>
-              </div>
-              <div className="recipe-heading-actions">
-                <StatusBadge status={product.active ? 'com-ficha' : 'inativo'} />
-                <button
-                  className="ghost-button danger-button"
-                  disabled={savingAction === `delete-${sheet.id}`}
-                  type="button"
-                  onClick={() => handleDeleteSheet(sheet, product)}
-                >
-                  {savingAction === `delete-${sheet.id}` ? 'Excluindo...' : 'Excluir ficha'}
-                </button>
-              </div>
-            </div>
+            {cardHeading}
 
             <div className="recipe-metrics">
               <div>
@@ -289,7 +458,17 @@ export function TechnicalSheet({
                 <span>Rendimento</span>
                 <strong>{sheet.yield} un</strong>
               </div>
+              <div>
+                <span>Da para fazer</span>
+                <strong>{stockCapacity.capacity} un</strong>
+              </div>
             </div>
+
+            {stockCapacity.limitingItem?.item && (
+              <div className={stockCapacity.capacity <= 0 ? 'form-alert' : 'form-hint'}>
+                Limite atual: {stockCapacity.limitingItem.item.name} com {number.format(stockCapacity.limitingItem.currentStock)} {stockCapacity.limitingItem.item.unit} em estoque.
+              </div>
+            )}
 
             {sheetMessage?.sheetId === sheet.id && (
               <div className={sheetMessage.ok ? 'form-hint' : 'form-alert'}>{sheetMessage.text}</div>

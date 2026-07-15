@@ -23,7 +23,32 @@ const emptyItemForm = {
   supplier: '',
 }
 
-export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryItem, onStockAdjustment, onStockEntry, stockAdjustments = [] }) {
+function normalizeSearchText(value = '') {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function matchesInventorySearch(item, searchTerm) {
+  if (!searchTerm) return true
+  return [
+    item.name,
+    item.category,
+    item.unit,
+    item.supplier,
+  ].some((field) => normalizeSearchText(field).includes(searchTerm))
+}
+
+function compareInventoryItems(firstItem, secondItem) {
+  const firstCategory = String(firstItem?.category ?? '')
+  const secondCategory = String(secondItem?.category ?? '')
+  if (firstCategory !== secondCategory) return firstCategory.localeCompare(secondCategory, 'pt-BR')
+  return String(firstItem?.name ?? '').localeCompare(String(secondItem?.name ?? ''), 'pt-BR')
+}
+
+export function Inventory({ inventoryItems, onSaveInventoryItem, onStockAdjustment, onStockEntry, stockAdjustments = [] }) {
   const [entryForm, setEntryForm] = useState({
     inventoryItemId: inventoryItems[0]?.id ?? '',
     quantity: '',
@@ -39,10 +64,10 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
   const [entryMessage, setEntryMessage] = useState(null)
   const [adjustmentMessage, setAdjustmentMessage] = useState(null)
   const [itemMessage, setItemMessage] = useState(null)
-  const [maintenanceMessage, setMaintenanceMessage] = useState(null)
-  const [maintenanceLoading, setMaintenanceLoading] = useState(false)
   const [itemEditorOpen, setItemEditorOpen] = useState(false)
   const [itemSaving, setItemSaving] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
+  const [inventorySearch, setInventorySearch] = useState('')
 
   const stockValue = inventoryItems.reduce((total, item) => total + item.currentStock * item.averageCost, 0)
   const lowItems = inventoryItems.filter((item) => getStockStatus(item) !== 'saudavel')
@@ -50,6 +75,14 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
   const selectedItem = inventoryItems.find((item) => item.id === Number(entryForm.inventoryItemId))
   const selectedAdjustmentItem = inventoryItems.find((item) => item.id === Number(adjustmentForm.inventoryItemId))
   const editingItem = inventoryItems.find((item) => item.id === Number(itemForm.id))
+  const inventoryCategories = Array.from(
+    new Set(inventoryItems.map((item) => item.category).filter(Boolean)),
+  ).sort((firstCategory, secondCategory) => firstCategory.localeCompare(secondCategory, 'pt-BR'))
+  const inventorySearchTerm = normalizeSearchText(inventorySearch)
+  const visibleInventoryItems = inventoryItems
+    .filter((item) => categoryFilter === 'Todas' || item.category === categoryFilter)
+    .filter((item) => matchesInventorySearch(item, inventorySearchTerm))
+    .sort(compareInventoryItems)
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -116,8 +149,8 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
       return
     }
 
-    if (!Number.isFinite(currentStock) || !Number.isFinite(minStock) || !Number.isFinite(averageCost) || currentStock < 0 || minStock < 0 || averageCost < 0) {
-      setItemMessage({ ok: false, text: 'Informe estoque, minimo e custo medio com numeros validos.' })
+    if (!Number.isFinite(currentStock) || !Number.isFinite(minStock) || !Number.isFinite(averageCost) || minStock < 0 || averageCost < 0) {
+      setItemMessage({ ok: false, text: 'Informe estoque, minimo e custo medio com numeros validos. O estoque atual pode ficar negativo em ajuste/teste.' })
       return
     }
 
@@ -180,29 +213,6 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
     }))
   }
 
-  async function handleResetInventory() {
-    if (!onResetInventory) return
-    if (!window.confirm('Zerar todas as quantidades do estoque? Os insumos continuam cadastrados.')) return
-
-    setMaintenanceLoading(true)
-    setMaintenanceMessage(null)
-
-    try {
-      const result = await onResetInventory()
-      setMaintenanceMessage({
-        ok: result?.ok !== false,
-        text: result?.message ?? 'Estoque zerado.',
-      })
-    } catch (error) {
-      setMaintenanceMessage({
-        ok: false,
-        text: error?.message ?? 'Nao foi possivel zerar o estoque.',
-      })
-    } finally {
-      setMaintenanceLoading(false)
-    }
-  }
-
   return (
     <div className="module-grid">
       <section className="stats-grid compact-stats">
@@ -236,21 +246,31 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
             <button className="secondary-button" type="button" onClick={handleNewItem}>
               Novo insumo
             </button>
-            {onResetInventory && (
-              <button
-                className="ghost-button danger-button"
-                disabled={maintenanceLoading}
-                type="button"
-                onClick={handleResetInventory}
-              >
-                {maintenanceLoading ? 'Zerando...' : 'Limpar estoque'}
-              </button>
-            )}
           </div>
         </div>
-        {maintenanceMessage && (
-          <div className={maintenanceMessage.ok ? 'form-hint' : 'form-alert'}>{maintenanceMessage.text}</div>
-        )}
+
+        <div className="admin-filter-strip">
+          <label className="admin-filter-field">
+            Filtrar categoria
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="Todas">Todas as categorias</option>
+              {inventoryCategories.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-filter-field admin-filter-field-wide">
+            Buscar insumo
+            <input
+              value={inventorySearch}
+              onChange={(event) => setInventorySearch(event.target.value)}
+              placeholder="Nome, categoria, unidade ou fornecedor"
+            />
+          </label>
+          <span className="filter-result-pill">
+            {visibleInventoryItems.length} de {inventoryItems.length} insumo(s)
+          </span>
+        </div>
 
         <div className="responsive-table">
           <table>
@@ -267,7 +287,12 @@ export function Inventory({ inventoryItems, onResetInventory, onSaveInventoryIte
                 </tr>
               </thead>
               <tbody>
-              {inventoryItems.map((item) => (
+              {visibleInventoryItems.length === 0 && (
+                <tr>
+                  <td colSpan="8">Nenhum insumo encontrado nesse filtro.</td>
+                </tr>
+              )}
+              {visibleInventoryItems.map((item) => (
                 <tr key={item.id}>
                   <td>{item.name}</td>
                   <td>{item.category}</td>

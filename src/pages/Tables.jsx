@@ -431,6 +431,14 @@ export function Tables({
 
   function handleRequestSelectedTableClose() {
     if (!selectedTable) return
+    if (
+      selectedTable.status !== 'fechamento' &&
+      Number(selectedTable.total || 0) > 0 &&
+      !window.confirm('Essa mesa ainda nao solicitou fechamento pelo QR Code. Tem certeza que deseja enviar a conta para o caixa?')
+    ) {
+      return
+    }
+
     const result = onRequestTableClose?.(selectedTable.id, { tabId: 'all' })
     setOrderMessage(result ?? { ok: false, message: 'Nao foi possivel solicitar fechamento desta mesa.' })
   }
@@ -443,6 +451,13 @@ export function Tables({
 
   function handleRequestSelectedTabClose() {
     if (!selectedTable || !selectedTab) return
+    if (
+      selectedTab.status !== 'fechamento' &&
+      selectedTabTotal > 0 &&
+      !window.confirm(`A comanda de ${selectedTab.name ?? 'Mesa'} ainda nao solicitou fechamento pelo QR Code. Tem certeza que deseja enviar para o caixa?`)
+    ) {
+      return
+    }
 
     const result = onRequestTableClose?.(selectedTable.id, {
       customerName: selectedTab.customerName ?? selectedTab.name,

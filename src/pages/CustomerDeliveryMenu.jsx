@@ -6,9 +6,15 @@ import {
   loadClientDeliveryAccounts,
   loadClientDeliveryOrders,
   loadClientDeliverySession,
+  mergeAndSaveClientDeliveryOrders,
   saveClientDeliveryAccounts,
   saveClientDeliverySession,
 } from '../lib/clientDeliveryOrders.js'
+import {
+  insertClientDeliveryOrderToSupabase,
+  loadClientDeliveryOrdersForCustomerFromSupabase,
+  persistClientDeliveryOrderToSupabaseReliable,
+} from '../lib/clientDeliverySupabaseRepository.js'
 import { buildOrderNotes, meatPointOptions } from '../lib/orderModifiers.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -251,16 +257,38 @@ export function CustomerDeliveryMenu({ products = [] }) {
   }, [cartToast])
 
   useEffect(() => {
-    const syncOrders = () => setOrdersVersion((version) => version + 1)
-    const intervalId = window.setInterval(syncOrders, 5000)
+    let cancelled = false
+    const syncOrders = () => {
+      if (!cancelled) setOrdersVersion((version) => version + 1)
+    }
+    const syncRemoteOrders = async () => {
+      if (!session) {
+        syncOrders()
+        return
+      }
+
+      const remoteResult = await loadClientDeliveryOrdersForCustomerFromSupabase({
+        sessionId: session.id,
+        phone: session.phone,
+        email: session.email,
+      })
+
+      if (remoteResult.ok && remoteResult.orders.length) {
+        mergeAndSaveClientDeliveryOrders(remoteResult.orders)
+      }
+      syncOrders()
+    }
+    const intervalId = window.setInterval(syncRemoteOrders, 5000)
+    syncRemoteOrders()
     window.addEventListener('storage', syncOrders)
     window.addEventListener('loccoburger:client-delivery-orders-updated', syncOrders)
     return () => {
+      cancelled = true
       window.clearInterval(intervalId)
       window.removeEventListener('storage', syncOrders)
       window.removeEventListener('loccoburger:client-delivery-orders-updated', syncOrders)
     }
-  }, [])
+  }, [session])
 
   async function openDeliveryAccount(event) {
     event.preventDefault()
@@ -491,8 +519,12 @@ export function CustomerDeliveryMenu({ products = [] }) {
     setIsSendingOrder(true)
     setMessage({ ok: true, text: 'Enviando seu pedido para a loja...' })
 
-    window.setTimeout(() => {
+    window.setTimeout(async () => {
       const order = appendClientDeliveryOrder(orderPayload)
+      const remoteResult = await insertClientDeliveryOrderToSupabase(order)
+      if (!remoteResult.ok) {
+        persistClientDeliveryOrderToSupabaseReliable(order, { operation: 'insert', attempts: 6, intervalMs: 1500 })
+      }
 
       setCart([])
       setNotes('')

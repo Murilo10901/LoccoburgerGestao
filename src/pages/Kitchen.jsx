@@ -24,6 +24,20 @@ function formatTimerMinutes(minutes) {
   return `${String(hours).padStart(2, '0')}:${remainingMinutes}`
 }
 
+function getLocalDayKey(value = Date.now()) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function isToday(value, now = Date.now()) {
+  return Boolean(value && getLocalDayKey(value) === getLocalDayKey(now))
+}
+
 function getKitchenTiming(order, now) {
   const end = order.deliveredAt ?? order.completedAt ?? now
   const elapsedMinutes = minutesBetween(order.createdAt, end)
@@ -162,7 +176,7 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
   const [kitchenMessage, setKitchenMessage] = useState(null)
   const [now, setNow] = useState(Date.now())
   const activeOrders = orders.filter((order) => order.status !== 'finalizado')
-  const completedOrders = orders.filter((order) => order.completedAt)
+  const completedOrders = orders.filter((order) => order.completedAt && isToday(order.completedAt, now))
   const sortedCompletedOrders = [...completedOrders].sort(
     (first, second) => Number(second.completedAt ?? second.deliveredAt ?? 0) - Number(first.completedAt ?? first.deliveredAt ?? 0),
   )
@@ -175,7 +189,7 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
     : 0
   const onTargetOrders = completedOrders.filter((order) => minutesBetween(order.createdAt, order.completedAt) <= order.targetMinutes)
   const onTargetRate = completedOrders.length ? (onTargetOrders.length / completedOrders.length) * 100 : 0
-  const productionByHour = Object.entries(groupByHour(orders))
+  const productionByHour = Object.entries(groupByHour(completedOrders))
   const sortedActiveOrders = sortKitchenOrders(activeOrders, sortMode, now)
   const delayedOrders = activeOrders.filter((order) => getKitchenTiming(order, now).delayed)
   const groupedOrders = Object.values(groupBySource(sortedActiveOrders)).sort((a, b) => {
@@ -291,7 +305,7 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
           <strong>{onTargetRate.toFixed(0)}%</strong>
         </Card>
         <Card className="stat-card">
-          <span>Finalizados</span>
+          <span>Finalizados hoje</span>
           <strong>{completedOrders.length}</strong>
         </Card>
         <Card className="stat-card">
@@ -484,7 +498,7 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
         </div>
         <div className="kitchen-completed-stack">
           {visibleCompletedOrders.length === 0 ? (
-            <p className="empty-state">Nenhum atendimento finalizado neste filtro.</p>
+            <p className="empty-state">Nenhum atendimento finalizado hoje neste filtro.</p>
           ) : visibleCompletedOrders.slice(0, 14).map((order) => (
             <details className="kitchen-completed-item" key={order.id}>
               <summary>
@@ -512,7 +526,7 @@ export function Kitchen({ onAdvanceOrder, onPrioritizeOrder, orders }) {
         </div>
         <div className="hour-list">
           {productionByHour.length === 0 ? (
-            <p className="empty-state">Nenhum pedido finalizado ainda.</p>
+            <p className="empty-state">Nenhum pedido finalizado hoje.</p>
           ) : (
             productionByHour.map(([hour, quantity]) => (
               <div className="hour-row" key={hour}>

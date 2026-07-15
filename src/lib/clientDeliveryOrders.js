@@ -30,6 +30,31 @@ function normalizeClientDeliveryOrder(order) {
   return order
 }
 
+function getClientDeliveryOrderTime(order = {}) {
+  const timestamp = order.updatedAt ?? order.processedAt ?? order.deliveredAt ?? order.paidAt ?? order.createdAt
+  const parsedTime = new Date(timestamp ?? 0).getTime()
+  if (Number.isFinite(parsedTime)) return parsedTime
+
+  const numericId = Number(String(order.id ?? '').match(/\d{10,}/)?.[0])
+  return Number.isFinite(numericId) ? numericId : 0
+}
+
+export function normalizeClientDeliveryOrders(orders) {
+  const ordersById = new Map()
+
+  ;(Array.isArray(orders) ? orders : []).forEach((order) => {
+    const normalizedOrder = normalizeClientDeliveryOrder(order)
+    if (!normalizedOrder?.id) return
+
+    const currentOrder = ordersById.get(normalizedOrder.id)
+    if (!currentOrder || getClientDeliveryOrderTime(normalizedOrder) >= getClientDeliveryOrderTime(currentOrder)) {
+      ordersById.set(normalizedOrder.id, normalizedOrder)
+    }
+  })
+
+  return Array.from(ordersById.values()).sort((first, second) => getClientDeliveryOrderTime(second) - getClientDeliveryOrderTime(first))
+}
+
 export function loadClientDeliveryOrders() {
   if (!canUseStorage()) return []
 
@@ -37,7 +62,7 @@ export function loadClientDeliveryOrders() {
     const parsedOrders = JSON.parse(window.localStorage.getItem(clientDeliveryOrdersStorageKey) ?? '[]')
     if (!Array.isArray(parsedOrders)) return []
 
-    const normalizedOrders = parsedOrders.map(normalizeClientDeliveryOrder)
+    const normalizedOrders = normalizeClientDeliveryOrders(parsedOrders)
     if (JSON.stringify(normalizedOrders) !== JSON.stringify(parsedOrders)) {
       saveClientDeliveryOrders(normalizedOrders)
     }
@@ -51,14 +76,25 @@ export function loadClientDeliveryOrders() {
 export function saveClientDeliveryOrders(orders) {
   if (!canUseStorage()) return []
 
-  const safeOrders = Array.isArray(orders) ? orders : []
+  const safeOrders = normalizeClientDeliveryOrders(orders)
   window.localStorage.setItem(clientDeliveryOrdersStorageKey, JSON.stringify(safeOrders))
   window.dispatchEvent(new CustomEvent('loccoburger:client-delivery-orders-updated', { detail: safeOrders }))
   return safeOrders
 }
 
+export function mergeClientDeliveryOrders(currentOrders = [], incomingOrders = []) {
+  return normalizeClientDeliveryOrders([
+    ...(Array.isArray(currentOrders) ? currentOrders : []),
+    ...(Array.isArray(incomingOrders) ? incomingOrders : []),
+  ])
+}
+
+export function mergeAndSaveClientDeliveryOrders(incomingOrders = []) {
+  return saveClientDeliveryOrders(mergeClientDeliveryOrders(loadClientDeliveryOrders(), incomingOrders))
+}
+
 export function appendClientDeliveryOrder(order) {
-  const nextOrders = [normalizeClientDeliveryOrder(order), ...loadClientDeliveryOrders()]
+  const nextOrders = mergeClientDeliveryOrders(loadClientDeliveryOrders(), [order])
   saveClientDeliveryOrders(nextOrders)
   return order
 }

@@ -48,6 +48,39 @@ function getPayableTableTotal(table) {
   return getClosingTabs(table).reduce((total, tab) => total + getTabTotal(tab), 0)
 }
 
+function getTableDisplayNumber(table) {
+  return table?.tableNumber ?? table?.id ?? ''
+}
+
+function getPayableTableTitle(table) {
+  const tableLabel = `Mesa ${String(getTableDisplayNumber(table)).padStart(2, '0')}`
+  if (isWholeTableClosing(table)) return `${tableLabel} - mesa inteira`
+
+  const closingTabs = getClosingTabs(table)
+  if (closingTabs.length === 1) return `${tableLabel} - ${closingTabs[0].name}`
+
+  return `${tableLabel} - ${closingTabs.length} comandas`
+}
+
+function getPayableTableSubtitle(table) {
+  if (isWholeTableClosing(table)) {
+    const customerName = table?.customerName || table?.attendant || 'mesa inteira'
+    const customerPhone = table?.customerPhone ? ` • ${table.customerPhone}` : ''
+    return `${customerName}${customerPhone} • ${getTableItems(table).length} itens`
+  }
+
+  const closingTabs = getClosingTabs(table)
+  if (closingTabs.length === 1) {
+    const tab = closingTabs[0]
+    const phone = tab.customerPhone || tab.phone || table?.customerPhone || 'sem telefone'
+    return `${phone} • ${(tab.orderItems ?? []).length} itens`
+  }
+
+  return closingTabs
+    .map((tab) => `${tab.name}${tab.customerPhone ? ` (${tab.customerPhone})` : ''}`)
+    .join(' • ')
+}
+
 function getTableItems(table) {
   const directItems = table?.orderItems ?? []
   if (directItems.length > 0) return directItems
@@ -515,12 +548,8 @@ export function Cashier({
                   }}
                 >
                   <div>
-                    <strong>Mesa {String(table.id).padStart(2, '0')}</strong>
-                    <span>
-                      {isWholeTableClosing(table)
-                        ? `${getTableItems(table).length} itens - mesa inteira`
-                        : `${getClosingTabs(table).length} comanda(s) em fechamento`}
-                    </span>
+                    <strong>{getPayableTableTitle(table)}</strong>
+                    <span>{getPayableTableSubtitle(table)}</span>
                   </div>
                   <StatusBadge status={table.status} />
                   <b>{currency.format(getPayableTableTotal(table))}</b>
@@ -559,9 +588,12 @@ export function Cashier({
               {selectedDelivery
                 ? `Delivery ${selectedDelivery.id}`
                 : selectedTable
-                  ? `Mesa ${String(selectedTable.id).padStart(2, '0')}`
+                  ? getPayableTableTitle(selectedTable)
                   : 'Sem conta'}
             </h2>
+            {selectedTable && (
+              <small>{getPayableTableSubtitle(selectedTable)}</small>
+            )}
           </div>
         </div>
 

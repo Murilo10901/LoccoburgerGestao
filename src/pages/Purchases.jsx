@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import jsQR from 'jsqr'
 import { Card } from '../components/Card.jsx'
 import { StatusBadge } from '../components/StatusBadge.jsx'
 import {
@@ -12,6 +13,7 @@ import { createPurchaseSuggestion } from '../lib/purchaseRepository.js'
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const number = new Intl.NumberFormat('pt-BR')
+const maxQrImageSide = 1400
 
 function getPurchaseSuggestionRows(items) {
   return items.map((item) => {
@@ -61,6 +63,54 @@ function guessInventoryItemId(fiscalName, inventoryItems) {
     ?? ''
 }
 
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const imageUrl = URL.createObjectURL(file)
+    const image = new Image()
+
+    image.onload = () => resolve({ image, imageUrl })
+    image.onerror = () => {
+      URL.revokeObjectURL(imageUrl)
+      reject(new Error('Nao consegui abrir a imagem. Tente tirar a foto novamente com o QR Code bem enquadrado.'))
+    }
+    image.src = imageUrl
+  })
+}
+
+async function decodeQrCodeFromImageFile(file) {
+  const { image, imageUrl } = await loadImageFromFile(file)
+
+  try {
+    const naturalWidth = image.naturalWidth || image.width
+    const naturalHeight = image.naturalHeight || image.height
+    const scale = Math.min(1, maxQrImageSide / Math.max(naturalWidth, naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(naturalHeight * scale))
+
+    let context
+    try {
+      context = canvas.getContext('2d', { willReadFrequently: true })
+    } catch {
+      context = canvas.getContext('2d')
+    }
+
+    if (!context) {
+      throw new Error('Este navegador nao liberou leitura da imagem.')
+    }
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+    const result = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: 'attemptBoth',
+    })
+
+    return result?.data || ''
+  } finally {
+    URL.revokeObjectURL(imageUrl)
+  }
+}
+
 export function Purchases({
   inventoryItems,
   onCancelPurchaseOrder,
@@ -85,6 +135,8 @@ export function Purchases({
   })
   const [exportMessage, setExportMessage] = useState('')
   const [purchaseMessage, setPurchaseMessage] = useState(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const qrFileInputRef = useRef(null)
 
   const selectedItem = inventoryItems.find((item) => item.id === Number(purchaseForm.inventoryItemId))
   const suggestedMaxPrice = selectedItem ? getSuggestedPurchaseMaxPrice(selectedItem) : 0
@@ -103,6 +155,7 @@ export function Purchases({
       ...result.draft,
       items: result.draft.items.map((item) => ({
         ...item,
+        included: true,
         inventoryItemId: item.suggestedInventoryId || guessInventoryItemId(item.fiscalName, inventoryItems),
       })),
     })
@@ -123,24 +176,18 @@ export function Purchases({
     const file = event.target.files?.[0]
     if (!file) return
 
-    if (!('BarcodeDetector' in window)) {
-      setPurchaseMessage({ ok: false, text: 'Este navegador nao conseguiu ler QR Code pela imagem. Cole a URL do cupom no campo acima.' })
-      return
-    }
-
     setCouponLoading(true)
     try {
-      const detector = new window.BarcodeDetector({ formats: ['qr_code'] })
-      const bitmap = await createImageBitmap(file)
-      const codes = await detector.detect(bitmap)
-      const value = codes[0]?.rawValue
+      setPurchaseMessage({ ok: true, text: 'Lendo QR Code da imagem...' })
+      const value = await decodeQrCodeFromImageFile(file)
 
       if (!value) {
-        setPurchaseMessage({ ok: false, text: 'Nao encontrei QR Code nessa imagem.' })
+        setPurchaseMessage({ ok: false, text: 'Nao encontrei QR Code nessa imagem. Tente uma foto mais perto, sem reflexo e com o QR inteiro aparecendo.' })
         return
       }
 
       setQrInput(value)
+      setScannerOpen(false)
       await readCouponFromValue(value)
     } catch (error) {
       setPurchaseMessage({ ok: false, text: `Nao foi possivel ler a imagem do QR Code: ${error.message}` })
@@ -148,6 +195,10 @@ export function Purchases({
       setCouponLoading(false)
       event.target.value = ''
     }
+  }
+
+  function openQrCameraPicker() {
+    qrFileInputRef.current?.click()
   }
 
   function updateCouponItem(index, field, value) {
@@ -159,9 +210,19 @@ export function Purchases({
     }))
   }
 
+  function toggleCouponItem(index) {
+    setCouponDraft((currentDraft) => ({
+      ...currentDraft,
+      items: currentDraft.items.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, included: item.included === false } : item,
+      ),
+    }))
+  }
+
   function confirmCouponImport() {
     if (!couponDraft) return
     const validItems = couponDraft.items
+      .filter((item) => item.included !== false)
       .map((item) => ({
         inventoryItemId: Number(item.inventoryItemId),
         quantity: Number(item.quantity),
@@ -170,7 +231,7 @@ export function Purchases({
       .filter((item) => item.inventoryItemId && item.quantity > 0 && item.unitCost > 0)
 
     if (validItems.length === 0) {
-      setPurchaseMessage({ ok: false, text: 'Revise os itens importados antes de confirmar a entrada.' })
+      setPurchaseMessage({ ok: false, text: 'Revise os itens importados: pelo menos um item precisa estar ativo para entrar no estoque.' })
       return
     }
 
@@ -400,13 +461,60 @@ export function Purchases({
             {couponLoading ? 'Consultando...' : 'Consultar SEFAZ'}
           </button>
         </form>
-        <label className="file-scan-button">
-          Escanear imagem do QR Code
-          <input accept="image/*" capture="environment" type="file" onChange={handleQrImageUpload} />
-        </label>
+        <div className="sefaz-scan-actions">
+          <button className="primary-button" disabled={couponLoading} type="button" onClick={() => setScannerOpen(true)}>
+            Abrir scanner SEFAZ
+          </button>
+          <button className="ghost-button" disabled={couponLoading} type="button" onClick={openQrCameraPicker}>
+            Tirar foto do QR Code
+          </button>
+          <input
+            ref={qrFileInputRef}
+            accept="image/*"
+            capture="environment"
+            className="qr-scan-hidden-input"
+            type="file"
+            onChange={handleQrImageUpload}
+          />
+        </div>
         {purchaseMessage && (
           <div className={purchaseMessage.ok ? 'form-hint' : 'form-alert'}>
             {purchaseMessage.text}
+          </div>
+        )}
+
+        {scannerOpen && (
+          <div className="sefaz-scanner-overlay" role="dialog" aria-modal="true" aria-label="Scanner SEFAZ">
+            <div className="sefaz-scanner-modal">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Scanner SEFAZ</p>
+                  <h2>Ler QR Code da NFC-e</h2>
+                </div>
+                <button className="ghost-button" type="button" onClick={() => setScannerOpen(false)}>
+                  Fechar
+                </button>
+              </div>
+
+              <div className="sefaz-scanner-frame">
+                <span />
+                <strong>Enquadre o QR Code do cupom</strong>
+                <p>No iPad antigo, o jeito mais estavel e tirar uma foto nítida do QR Code.</p>
+              </div>
+
+              <div className="sefaz-scanner-buttons">
+                <button className="primary-button" disabled={couponLoading} type="button" onClick={openQrCameraPicker}>
+                  Abrir camera / escolher foto
+                </button>
+                <button className="secondary-button" type="button" onClick={() => setScannerOpen(false)}>
+                  Colar URL manualmente
+                </button>
+              </div>
+
+              <div className="form-hint">
+                Dica: tire a foto com boa luz, sem cortar as bordas do QR. Depois que ler, o sistema preenche a URL e consulta a SEFAZ automaticamente.
+              </div>
+            </div>
           </div>
         )}
 
@@ -414,6 +522,9 @@ export function Purchases({
           <div className="coupon-preview">
             <div className="form-hint">
               Fornecedor: {couponDraft.supplier} - Chave: {couponDraft.fiscalKey}
+            </div>
+            <div className="form-hint">
+              Itens ativos: {couponDraft.items.filter((item) => item.included !== false).length} de {couponDraft.items.length}. Itens excluidos aqui nao entram no estoque.
             </div>
             <div className="responsive-table">
               <table>
@@ -424,14 +535,16 @@ export function Purchases({
                     <th>Qtd</th>
                     <th>Custo unit.</th>
                     <th>Total</th>
+                    <th>Acao</th>
                   </tr>
                 </thead>
                 <tbody>
                   {couponDraft.items.map((item, index) => (
-                    <tr key={item.fiscalName}>
+                    <tr className={item.included === false ? 'coupon-ignored-row' : ''} key={`${item.fiscalName}-${index}`}>
                       <td>{item.fiscalName}</td>
                       <td>
                         <select
+                          disabled={item.included === false}
                           value={item.inventoryItemId}
                           onChange={(event) => updateCouponItem(index, 'inventoryItemId', Number(event.target.value))}
                         >
@@ -442,6 +555,7 @@ export function Purchases({
                       </td>
                       <td>
                         <input
+                          disabled={item.included === false}
                           min="0"
                           step="0.01"
                           type="number"
@@ -451,6 +565,7 @@ export function Purchases({
                       </td>
                       <td>
                         <input
+                          disabled={item.included === false}
                           min="0"
                           step="0.001"
                           type="number"
@@ -459,6 +574,14 @@ export function Purchases({
                         />
                       </td>
                       <td>{currency.format(Number(item.quantity) * Number(item.unitCost))}</td>
+                      <td>
+                        <div className="coupon-item-action">
+                          <button className={item.included === false ? 'secondary-button' : 'ghost-button'} type="button" onClick={() => toggleCouponItem(index)}>
+                            {item.included === false ? 'Reativar' : 'Excluir item'}
+                          </button>
+                          {item.included === false && <small>Ignorado</small>}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

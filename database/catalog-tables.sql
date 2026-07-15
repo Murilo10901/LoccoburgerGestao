@@ -9,13 +9,22 @@ create table if not exists public.user_products (
   name text not null,
   category text not null,
   type text not null,
+  description text not null default '',
   price numeric(12, 2) not null default 0,
   active boolean not null default true,
   recipe_app_id bigint,
+  image_url text,
+  available_delivery boolean not null default true,
+  available_qr boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique(user_id, app_id)
 );
+
+alter table public.user_products add column if not exists description text not null default '';
+alter table public.user_products add column if not exists image_url text;
+alter table public.user_products add column if not exists available_delivery boolean not null default true;
+alter table public.user_products add column if not exists available_qr boolean not null default true;
 
 create table if not exists public.user_inventory_items (
   id uuid primary key default gen_random_uuid(),

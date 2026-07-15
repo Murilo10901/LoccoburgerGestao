@@ -1506,25 +1506,85 @@ textarea {
   align-items: end;
 }
 
-.file-scan-button {
-  display: inline-flex;
-  width: fit-content;
-  min-height: 38px;
+.sefaz-scan-actions {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  border: 1px solid #edcfb5;
-  border-radius: 12px;
-  padding: 8px 12px;
-  color: #7a3b1a;
-  background: #fffaf5;
-  font-size: 0.86rem;
-  font-weight: 900;
-  cursor: pointer;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
 }
 
-.file-scan-button input {
-  display: none;
+.qr-scan-hidden-input {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sefaz-scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(22, 10, 5, 0.68);
+}
+
+.sefaz-scanner-modal {
+  display: grid;
+  width: min(520px, 100%);
+  max-height: min(90vh, 720px);
+  gap: 16px;
+  overflow: auto;
+  border: 1px solid #edcfb5;
+  border-radius: 26px;
+  padding: 18px;
+  background: #fff8ef;
+  box-shadow: 0 24px 70px rgba(45, 22, 15, 0.28);
+}
+
+.sefaz-scanner-frame {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 2px dashed #ffc24b;
+  border-radius: 24px;
+  padding: 22px;
+  text-align: center;
+  color: #2d160f;
+  background: linear-gradient(145deg, #20140c, #3b2d17);
+}
+
+.sefaz-scanner-frame span {
+  width: 82px;
+  height: 82px;
+  border: 3px solid #ffc24b;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 10px rgba(255, 194, 75, 0.12),
+    inset 0 0 0 8px rgba(255, 194, 75, 0.08);
+}
+
+.sefaz-scanner-frame strong {
+  color: #fffaf5;
+  font-size: 1.15rem;
+}
+
+.sefaz-scanner-frame p {
+  max-width: 340px;
+  margin: 0;
+  color: #eadcc6;
+  font-weight: 800;
+}
+
+.sefaz-scanner-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .coupon-preview {
@@ -1542,6 +1602,39 @@ textarea {
   padding: 7px 9px;
   color: #2d160f;
   background: #fffaf5;
+}
+
+.coupon-preview input:disabled,
+.coupon-preview select:disabled {
+  opacity: 0.62;
+  background: #efe2d4;
+}
+
+.coupon-ignored-row {
+  opacity: 0.62;
+  background: #fff1e8;
+}
+
+.coupon-ignored-row td:first-child {
+  text-decoration: line-through;
+}
+
+.coupon-item-action {
+  display: grid;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.coupon-item-action button {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.coupon-item-action small {
+  color: #a3411f;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .customer-profile {
@@ -2505,6 +2598,72 @@ td small {
   justify-content: flex-end;
 }
 
+.compact-filter-card {
+  min-height: auto;
+}
+
+.admin-filter-strip {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0 8px;
+  padding: 14px;
+  border: 1px solid #f2d7b7;
+  border-radius: 18px;
+  background: #fff8ef;
+}
+
+.admin-filter-field {
+  display: grid;
+  min-width: min(280px, 100%);
+  gap: 7px;
+  color: #7b3a16;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.admin-filter-field-wide {
+  flex: 1 1 340px;
+}
+
+.admin-filter-field select,
+.admin-filter-field input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #edcfb5;
+  border-radius: 12px;
+  padding: 9px 12px;
+  color: #2d160f;
+  background: #fffaf5;
+  font-size: 0.95rem;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.admin-filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-result-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  color: #7b3a16;
+  background: #ffe7b7;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
 .product-channel-note {
   display: block;
   margin-top: 4px;
@@ -2760,6 +2919,47 @@ td small {
 
 .recipe-card {
   min-height: 360px;
+}
+
+.recipe-card-collapsed {
+  min-height: auto;
+}
+
+.recipe-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.recipe-collapsed-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px;
+}
+
+.recipe-collapsed-summary > div {
+  padding: 12px;
+  border: 1px solid #f2d7b7;
+  border-radius: 14px;
+  background: #fff3df;
+}
+
+.recipe-collapsed-summary span {
+  display: block;
+  color: #7b3a16;
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.recipe-collapsed-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: #2d160f;
+  font-size: 1rem;
 }
 
 .recipe-metrics {
@@ -3049,6 +3249,25 @@ td small {
     grid-template-columns: 1fr;
   }
 
+  .admin-filter-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-filter-actions {
+    justify-content: stretch;
+  }
+
+  .admin-filter-actions .secondary-button,
+  .admin-filter-actions .ghost-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .recipe-heading-actions {
+    justify-content: flex-start;
+  }
+
   .product-image-preview {
     position: static;
   }
@@ -3158,6 +3377,32 @@ td small {
   .user-attach-form,
   .fiscal-form {
     grid-template-columns: 1fr;
+  }
+
+  .sefaz-scan-actions,
+  .sefaz-scanner-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .sefaz-scan-actions > button,
+  .sefaz-scanner-buttons > button {
+    width: 100%;
+  }
+
+  .sefaz-scanner-overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .sefaz-scanner-modal {
+    max-height: 94vh;
+    border-radius: 22px;
+    padding: 14px;
+  }
+
+  .sefaz-scanner-frame {
+    min-height: 200px;
   }
 
   .primary-button {

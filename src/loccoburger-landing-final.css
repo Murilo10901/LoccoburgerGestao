@@ -1665,3 +1665,159 @@ html.loccoburger-motion-ready .locco-premium [data-locco-reveal].is-visible {
       "card" !important;
   }
 }
+
+/* Ajuste de compatibilidade/performance: iPad antigo, celulares e menu lateral */
+.locco-premium-menu-button,
+.locco-premium-menu-backdrop {
+  display: none;
+}
+
+.locco-premium:not(.locco-premium-order-route),
+.locco-premium:not(.locco-premium-order-route) .locco-premium-hero {
+  min-height: 100vh !important;
+  min-height: 100svh !important;
+}
+
+@media (max-width: 1180px) {
+  .locco-premium:not(.locco-premium-order-route) {
+    padding-bottom: 0 !important;
+  }
+
+  .locco-premium-menu-button {
+    position: relative;
+    z-index: 160;
+    display: inline-grid !important;
+    width: 50px;
+    height: 50px;
+    place-items: center;
+    gap: 4px;
+    border: 1px solid rgba(255, 203, 65, 0.34);
+    border-radius: 18px;
+    background: rgba(11, 22, 14, 0.88);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    cursor: pointer;
+  }
+
+  .locco-premium-menu-button span {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: #ffc63f;
+    box-shadow: 0 0 12px rgba(255, 198, 63, 0.45);
+  }
+
+  .locco-premium-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    display: block !important;
+    border: 0;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.42);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  .locco-premium-menu-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-header .locco-premium-nav-drawer {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: auto !important;
+    z-index: 150 !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    align-content: start !important;
+    gap: 10px !important;
+    width: min(84vw, 340px) !important;
+    max-width: 340px !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-left: 1px solid rgba(255, 203, 65, 0.22) !important;
+    border-radius: 0 !important;
+    padding: calc(20px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom)) !important;
+    background: #07120d !important;
+    box-shadow: -28px 0 70px rgba(0, 0, 0, 0.52) !important;
+    backdrop-filter: none !important;
+    transform: translateX(105%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: transform 180ms ease, opacity 160ms ease !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-header .locco-premium-nav-drawer.is-open {
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-header .locco-premium-nav-drawer a,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-header .locco-premium-nav-drawer a:nth-child(1),
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-header .locco-premium-nav-drawer a:nth-child(2) {
+    display: flex !important;
+    min-height: 48px !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border: 1px solid rgba(255, 203, 65, 0.16) !important;
+    border-radius: 16px !important;
+    padding: 0 16px !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    color: #fff8e6 !important;
+    font-size: 0.98rem !important;
+    text-align: left !important;
+  }
+}
+
+@media (hover: none), (pointer: coarse), (max-width: 900px) {
+  .locco-premium-cursor-trail,
+  .locco-premium-cursor-dot {
+    display: none !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-noise,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-word {
+    opacity: 0.08 !important;
+  }
+
+  html.loccoburger-motion-ready .locco-premium [data-locco-reveal],
+  html.loccoburger-motion-ready .locco-premium .locco-premium-header,
+  html.loccoburger-motion-ready .locco-premium .locco-premium-copy > :not(.locco-premium-score-card),
+  html.loccoburger-motion-ready .locco-premium .locco-premium-section,
+  html.loccoburger-motion-ready .locco-premium .locco-premium-cards article {
+    filter: none !important;
+    transform: none !important;
+    transition-duration: 150ms !important;
+    will-change: auto !important;
+  }
+
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-header,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-cards article,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-meat-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-mayo-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-menu-section,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-location-card,
+  .locco-premium:not(.locco-premium-order-route) .locco-premium-hours-card {
+    backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .locco-premium *,
+  .locco-premium *::before,
+  .locco-premium *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -92,47 +92,62 @@ export async function saveOperationTables({ tables, kitchen }) {
   if (!user) return { ok: false, message: 'Entre no sistema para salvar operacao.' }
   const ownerId = await getDataOwnerId()
 
-  const deleteKitchen = await supabase.from('user_kitchen_tickets').delete().eq('user_id', ownerId)
-  const deleteTables = await supabase.from('user_restaurant_tables').delete().eq('user_id', ownerId)
-  const deleteError = deleteKitchen.error ?? deleteTables.error
-  if (deleteError) return { ok: false, message: `Erro ao limpar operacao antiga: ${deleteError.message}` }
+  const tableRows = tables.map((table) => ({
+    user_id: ownerId,
+    app_id: Number(table.id),
+    guests: Number(table.guests || 0),
+    status: table.status,
+    attendant: table.attendant ?? '-',
+    total: Number(table.total || 0),
+    order_items: table.orderItems ?? [],
+    tabs: serializeTableTabs(table),
+  }))
 
-  if (tables.length > 0) {
-    const { error } = await supabase.from('user_restaurant_tables').insert(
-      tables.map((table) => ({
-        user_id: ownerId,
-        app_id: Number(table.id),
-        guests: Number(table.guests || 0),
-        status: table.status,
-        attendant: table.attendant ?? '-',
-        total: Number(table.total || 0),
-        order_items: table.orderItems ?? [],
-        tabs: serializeTableTabs(table),
-      })),
-    )
+  const kitchenRows = kitchen.map((ticket) => ({
+    user_id: ownerId,
+    app_id: String(ticket.id),
+    source: ticket.source,
+    item: ticket.item,
+    modifiers: ticket.modifiers ?? null,
+    notes: ticket.notes ?? '',
+    status: ticket.status,
+    priority: ticket.priority,
+    created_at_ms: Number(ticket.createdAt || 0),
+    started_at_ms: ticket.startedAt ? Number(ticket.startedAt) : null,
+    finalized_at_ms: ticket.finalizedAt ? Number(ticket.finalizedAt) : null,
+    completed_at_ms: ticket.completedAt ? Number(ticket.completedAt) : null,
+    delivered_at_ms: ticket.deliveredAt ? Number(ticket.deliveredAt) : null,
+    target_minutes: Number(ticket.targetMinutes || 0),
+  }))
+
+  if (tableRows.length > 0) {
+    const { error } = await supabase
+      .from('user_restaurant_tables')
+      .upsert(tableRows, { onConflict: 'user_id,app_id' })
     if (error) return { ok: false, message: `Erro ao salvar mesas: ${error.message}` }
+
+    const tableIds = tableRows.map((row) => row.app_id).filter((id) => Number.isFinite(id))
+    if (tableIds.length > 0) {
+      const { error: pruneError } = await supabase
+        .from('user_restaurant_tables')
+        .delete()
+        .eq('user_id', ownerId)
+        .not('app_id', 'in', `(${tableIds.join(',')})`)
+      if (pruneError) return { ok: false, message: `Erro ao limpar mesas antigas: ${pruneError.message}` }
+    }
+  } else {
+    const { error } = await supabase.from('user_restaurant_tables').delete().eq('user_id', ownerId)
+    if (error) return { ok: false, message: `Erro ao limpar mesas: ${error.message}` }
   }
 
-  if (kitchen.length > 0) {
-    const { error } = await supabase.from('user_kitchen_tickets').insert(
-      kitchen.map((ticket) => ({
-        user_id: ownerId,
-        app_id: String(ticket.id),
-        source: ticket.source,
-        item: ticket.item,
-        modifiers: ticket.modifiers ?? null,
-        notes: ticket.notes ?? '',
-        status: ticket.status,
-        priority: ticket.priority,
-        created_at_ms: Number(ticket.createdAt || 0),
-        started_at_ms: ticket.startedAt ? Number(ticket.startedAt) : null,
-        finalized_at_ms: ticket.finalizedAt ? Number(ticket.finalizedAt) : null,
-        completed_at_ms: ticket.completedAt ? Number(ticket.completedAt) : null,
-        delivered_at_ms: ticket.deliveredAt ? Number(ticket.deliveredAt) : null,
-        target_minutes: Number(ticket.targetMinutes || 0),
-      })),
-    )
+  if (kitchenRows.length > 0) {
+    const { error } = await supabase
+      .from('user_kitchen_tickets')
+      .upsert(kitchenRows, { onConflict: 'user_id,app_id' })
     if (error) return { ok: false, message: `Erro ao salvar cozinha: ${error.message}` }
+  } else {
+    const { error } = await supabase.from('user_kitchen_tickets').delete().eq('user_id', ownerId)
+    if (error) return { ok: false, message: `Erro ao limpar cozinha: ${error.message}` }
   }
 
   return { ok: true, message: 'Operacao salva em tabelas proprias.' }

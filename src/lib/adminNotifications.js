@@ -16,6 +16,29 @@ export function getNextNotificationReset(now = new Date()) {
   return reset.getTime()
 }
 
+export function getCurrentNotificationWindowStart(now = new Date()) {
+  const start = new Date(now)
+  start.setHours(4, 0, 0, 0)
+
+  if (now.getTime() < start.getTime()) {
+    start.setDate(start.getDate() - 1)
+  }
+
+  return start.getTime()
+}
+
+function getNotificationTime(notification) {
+  const parsedTime = Date.parse(notification?.createdAt ?? notification?.updatedAt ?? '')
+  return Number.isFinite(parsedTime) ? parsedTime : 0
+}
+
+function filterCurrentNotifications(items) {
+  const windowStart = getCurrentNotificationWindowStart()
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => getNotificationTime(item) >= windowStart)
+    .slice(0, 120)
+}
+
 function normalizePayload(payload) {
   const nextResetAt = getNextNotificationReset()
 
@@ -29,7 +52,7 @@ function normalizePayload(payload) {
 
   return {
     resetAt: Number(payload.resetAt),
-    items: Array.isArray(payload.items) ? payload.items : [],
+    items: filterCurrentNotifications(payload.items),
   }
 }
 
@@ -48,7 +71,7 @@ export function loadAdminNotifications() {
 export function saveAdminNotifications(items) {
   const payload = {
     resetAt: getNextNotificationReset(),
-    items: Array.isArray(items) ? items : [],
+    items: filterCurrentNotifications(items),
   }
 
   if (canUseStorage()) {

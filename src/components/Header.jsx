@@ -13,10 +13,7 @@ export function Header({
   onMenuClick,
   onNavigate,
   onProfileChange,
-  onResetData,
   onResetFinancialData,
-  onResetInventoryStock,
-  onResetOperationData,
   icons,
   onLogout,
   repositoryStatus,
@@ -188,23 +185,9 @@ export function Header({
             {maintenanceOpen && (
               <div className="maintenance-menu">
                 <div>
-                  <strong>Limpeza segura</strong>
-                  <span>Salva a limpeza tambem no Supabase. Produtos e cardapio nao sao apagados.</span>
+                  <strong>Limpeza financeira</strong>
+                  <span>Limpa apenas faturamento, pagamentos, lucro, DRE e fechamentos. O estoque fica como esta.</span>
                 </div>
-                <button
-                  className="ghost-button"
-                  disabled={Boolean(maintenanceLoading)}
-                  type="button"
-                  onClick={() =>
-                    runMaintenance(
-                      'operation',
-                      onResetOperationData,
-                      'Limpar mesas, comandas, delivery e fila da cozinha? Esta acao zera a operacao atual.',
-                    )
-                  }
-                >
-                  {maintenanceLoading === 'operation' ? 'Limpando...' : 'Limpar operacao'}
-                </button>
                 <button
                   className="ghost-button"
                   disabled={Boolean(maintenanceLoading)}
@@ -218,34 +201,6 @@ export function Header({
                   }
                 >
                   {maintenanceLoading === 'financial' ? 'Limpando...' : 'Limpar financeiro/DRE'}
-                </button>
-                <button
-                  className="ghost-button danger-button"
-                  disabled={Boolean(maintenanceLoading)}
-                  type="button"
-                  onClick={() =>
-                    runMaintenance(
-                      'stock',
-                      onResetInventoryStock,
-                      'Zerar todas as quantidades do estoque? Os insumos continuam cadastrados.',
-                    )
-                  }
-                >
-                  {maintenanceLoading === 'stock' ? 'Zerando...' : 'Zerar estoque'}
-                </button>
-                <button
-                  className="ghost-button danger-button"
-                  disabled={Boolean(maintenanceLoading)}
-                  type="button"
-                  onClick={() =>
-                    runMaintenance(
-                      'all',
-                      onResetData,
-                      'Limpar todos os dados de teste da operacao, clientes, delivery e financeiro? Produtos e cardapio serao mantidos.',
-                    )
-                  }
-                >
-                  {maintenanceLoading === 'all' ? 'Limpando...' : 'Limpar tudo de teste'}
                 </button>
                 {maintenanceMessage && (
                   <p className={maintenanceMessage.ok ? 'form-hint' : 'form-alert'}>{maintenanceMessage.text}</p>

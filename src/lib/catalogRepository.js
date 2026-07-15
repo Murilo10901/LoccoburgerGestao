@@ -48,7 +48,16 @@ export function saveInventoryItem({ currentItems, item }) {
     supplier: item.supplier.trim(),
   }
 
-  if (!payload.name || !payload.category || !payload.unit || payload.currentStock < 0 || payload.minStock < 0) {
+  if (
+    !payload.name ||
+    !payload.category ||
+    !payload.unit ||
+    !Number.isFinite(payload.currentStock) ||
+    !Number.isFinite(payload.minStock) ||
+    !Number.isFinite(payload.averageCost) ||
+    payload.minStock < 0 ||
+    payload.averageCost < 0
+  ) {
     return currentItems
   }
 

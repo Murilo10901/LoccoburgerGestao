@@ -71,10 +71,23 @@ export const products = [
   { id: 9, sku: 'BUR-009', name: 'Locco Burger Triplo Smash', category: 'Burger', type: 'Produto acabado', price: 37.9, active: true, recipeId: 9 },
   { id: 10, sku: 'BUR-010', name: 'Locco Burger Kids', category: 'Burger', type: 'Produto acabado', price: 21.9, active: true, recipeId: 10 },
   { id: 11, sku: 'POR-001', name: 'Porcao de Batata', category: 'Porcao', type: 'Produto acabado', price: 20, active: true, recipeId: 11 },
-  { id: 12, sku: 'BEB-001', name: 'Refrigerante Lata', category: 'Bebida', type: 'Produto acabado', price: 7, active: true, recipeId: 12 },
+  { id: 12, sku: 'BEB-001', name: 'Refrigerante Coca-Cola Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Coca-Cola tradicional em lata 350ml.', price: 7, active: true, recipeId: 12, imageUrl: '', availableChannels: { delivery: true, qr: true } },
   { id: 13, sku: 'BEB-002', name: 'Cerveja Long Neck', category: 'Bebida', type: 'Produto acabado', price: 12, active: true, recipeId: 13 },
   { id: 14, sku: 'BEB-003', name: 'Agua', category: 'Bebida', type: 'Produto acabado', price: 5, active: true, recipeId: 14 },
-  { id: 15, sku: 'BEB-004', name: 'Suco de Lata', category: 'Bebida', type: 'Produto acabado', price: 10, active: true, recipeId: 15 },
+  { id: 15, sku: 'BEB-004', name: 'Suco Del Valle Maracuja 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Suco Del Valle sabor maracuja em lata 350ml.', price: 10, active: true, recipeId: 15, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 16, sku: 'BEB-005', name: 'Refrigerante Sprite Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Sprite sabor limao em lata 350ml.', price: 7, active: true, recipeId: 16, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 17, sku: 'BEB-006', name: 'Refrigerante Guarana Antarctica Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Guarana Antarctica tradicional em lata 350ml.', price: 7, active: true, recipeId: 17, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 18, sku: 'BEB-007', name: 'Refrigerante Guarana Antarctica Zero Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Guarana Antarctica Zero acucar em lata 350ml.', price: 7, active: true, recipeId: 18, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 19, sku: 'BEB-008', name: 'Refrigerante Fanta Uva Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Fanta sabor uva em lata 350ml.', price: 7, active: true, recipeId: 19, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 20, sku: 'BEB-009', name: 'Refrigerante Fanta Laranja Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Fanta sabor laranja em lata 350ml.', price: 7, active: true, recipeId: 20, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 21, sku: 'BEB-010', name: 'Refrigerante Pepsi Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Pepsi tradicional em lata 350ml.', price: 7, active: true, recipeId: 21, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 22, sku: 'BEB-011', name: 'Coca-Cola Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Coca-Cola tradicional em lata 350ml.', price: 7, active: true, recipeId: 22, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 23, sku: 'BEB-012', name: 'Refrigerante Coca-Cola Zero Lata 350ml', category: 'Bebida', type: 'Produto acabado', description: 'Refrigerante Coca-Cola Zero acucar em lata 350ml.', price: 7, active: true, recipeId: 23, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 24, sku: 'BEB-013', name: 'Heineken Long Neck 330ml', category: 'Bebida', type: 'Produto acabado', description: 'Cerveja Heineken long neck 330ml.', price: 12, active: true, recipeId: 24, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 25, sku: 'BEB-014', name: 'Heineken 0.0 Long Neck 330ml', category: 'Bebida', type: 'Produto acabado', description: 'Heineken 0.0 sem alcool long neck 330ml.', price: 12, active: true, recipeId: 25, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 26, sku: 'BEB-015', name: 'Budweiser Long Neck 330ml', category: 'Bebida', type: 'Produto acabado', description: 'Cerveja Budweiser long neck 330ml.', price: 12, active: true, recipeId: 26, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 27, sku: 'BEB-016', name: 'Stella Artois Long Neck 330ml', category: 'Bebida', type: 'Produto acabado', description: 'Cerveja Stella Artois long neck 330ml.', price: 12, active: true, recipeId: 27, imageUrl: '', availableChannels: { delivery: true, qr: true } },
+  { id: 28, sku: 'BEB-017', name: 'Corona Extra Long Neck 330ml', category: 'Bebida', type: 'Produto acabado', description: 'Cerveja Corona Extra long neck 330ml.', price: 12, active: true, recipeId: 28, imageUrl: '', availableChannels: { delivery: true, qr: true } },
 ]
 
 export const inventoryItems = [
@@ -108,6 +121,19 @@ export const inventoryItems = [
   { id: 28, name: 'Cerveja long neck', category: 'Bebidas', unit: 'un', currentStock: 72, minStock: 36, averageCost: 6.2, supplier: 'Distribuidora Bebidas' },
   { id: 29, name: 'Agua', category: 'Bebidas', unit: 'un', currentStock: 96, minStock: 48, averageCost: 1.6, supplier: 'Distribuidora Bebidas' },
   { id: 30, name: 'Suco de lata', category: 'Bebidas', unit: 'un', currentStock: 48, minStock: 24, averageCost: 4.9, supplier: 'Distribuidora Bebidas' },
+  { id: 31, name: 'Sprite Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 32, name: 'Guarana Antarctica Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 33, name: 'Guarana Antarctica Zero Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 34, name: 'Fanta Uva Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 35, name: 'Fanta Laranja Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 36, name: 'Pepsi Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 37, name: 'Coca-Cola Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 38, name: 'Coca-Cola Zero Lata 350ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 24, averageCost: 3.6, supplier: 'Distribuidora Bebidas' },
+  { id: 39, name: 'Heineken Long Neck 330ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 12, averageCost: 6.2, supplier: 'Distribuidora Bebidas' },
+  { id: 40, name: 'Heineken 0.0 Long Neck 330ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 12, averageCost: 6.2, supplier: 'Distribuidora Bebidas' },
+  { id: 41, name: 'Budweiser Long Neck 330ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 12, averageCost: 6.2, supplier: 'Distribuidora Bebidas' },
+  { id: 42, name: 'Stella Artois Long Neck 330ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 12, averageCost: 6.8, supplier: 'Distribuidora Bebidas' },
+  { id: 43, name: 'Corona Extra Long Neck 330ml', category: 'Bebidas', unit: 'un', currentStock: 0, minStock: 12, averageCost: 6.8, supplier: 'Distribuidora Bebidas' },
 ]
 
 export const technicalSheets = [
@@ -300,6 +326,123 @@ export const technicalSheets = [
     yield: 1,
     ingredients: [
       { inventoryItemId: 30, quantity: 1 },
+    ],
+  },
+  {
+    id: 16,
+    productId: 16,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 31, quantity: 1 },
+    ],
+  },
+  {
+    id: 17,
+    productId: 17,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 32, quantity: 1 },
+    ],
+  },
+  {
+    id: 18,
+    productId: 18,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 33, quantity: 1 },
+    ],
+  },
+  {
+    id: 19,
+    productId: 19,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 34, quantity: 1 },
+    ],
+  },
+  {
+    id: 20,
+    productId: 20,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 35, quantity: 1 },
+    ],
+  },
+  {
+    id: 21,
+    productId: 21,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 36, quantity: 1 },
+    ],
+  },
+  {
+    id: 22,
+    productId: 22,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 37, quantity: 1 },
+    ],
+  },
+  {
+    id: 23,
+    productId: 23,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 38, quantity: 1 },
+    ],
+  },
+  {
+    id: 24,
+    productId: 24,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 39, quantity: 1 },
+    ],
+  },
+  {
+    id: 25,
+    productId: 25,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 40, quantity: 1 },
+    ],
+  },
+  {
+    id: 26,
+    productId: 26,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 41, quantity: 1 },
+    ],
+  },
+  {
+    id: 27,
+    productId: 27,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 42, quantity: 1 },
+    ],
+  },
+  {
+    id: 28,
+    productId: 28,
+    prepTime: 1,
+    yield: 1,
+    ingredients: [
+      { inventoryItemId: 43, quantity: 1 },
     ],
   },
 ]

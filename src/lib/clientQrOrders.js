@@ -47,6 +47,37 @@ function getClientQrOrderTime(order = {}) {
   return Number.isFinite(parsedTime) ? parsedTime : 0
 }
 
+function getClientQrOrderCreatedTime(order = {}) {
+  const createdTimestamp = order.createdAt ?? order.submittedAt
+  const parsedCreatedTime = new Date(createdTimestamp ?? 0).getTime()
+  if (Number.isFinite(parsedCreatedTime) && parsedCreatedTime > 0) return parsedCreatedTime
+
+  const numericId = Number(String(order.id ?? '').match(/\d{10,}/)?.[0])
+  return Number.isFinite(numericId) ? numericId : 0
+}
+
+export function getClientQrOperationWindowStartTime(now = new Date()) {
+  const start = new Date(now)
+  start.setHours(4, 0, 0, 0)
+
+  if (now.getTime() < start.getTime()) {
+    start.setDate(start.getDate() - 1)
+  }
+
+  return start.getTime()
+}
+
+export function isClientQrOrderInCurrentOperation(order = {}, now = new Date()) {
+  if (!order?.id) return false
+
+  const timestamp = getClientQrOrderCreatedTime(order)
+  return timestamp >= getClientQrOperationWindowStartTime(now)
+}
+
+export function filterCurrentOperationClientQrOrders(orders = [], now = new Date()) {
+  return normalizeClientQrOrders(orders).filter((order) => isClientQrOrderInCurrentOperation(order, now))
+}
+
 export function normalizeClientQrOrders(orders) {
   const ordersById = new Map()
 
@@ -66,6 +97,13 @@ export function saveClientQrOrders(orders) {
   if (!canUseStorage()) return []
 
   const safeOrders = normalizeClientQrOrders(orders)
+  const safeOrderIds = new Set(safeOrders.map((order) => String(order.id)))
+
+  Object.keys(window.localStorage)
+    .filter((key) => key.startsWith(clientQrOrderItemStoragePrefix))
+    .filter((key) => !safeOrderIds.has(key.slice(clientQrOrderItemStoragePrefix.length)))
+    .forEach((key) => window.localStorage.removeItem(key))
+
   window.localStorage.setItem(clientQrOrdersStorageKey, JSON.stringify(safeOrders))
   safeOrders.forEach((order) => {
     if (order?.id) {

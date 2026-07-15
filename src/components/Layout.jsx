@@ -17,10 +17,7 @@ export function Layout({
   onNavigate,
   onLogout,
   onProfileChange,
-  onResetData,
   onResetFinancialData,
-  onResetInventoryStock,
-  onResetOperationData,
   pageTitle,
   repositoryStatus,
   syncStatus,
@@ -61,10 +58,7 @@ export function Layout({
           }}
           onLogout={onLogout}
           onProfileChange={onProfileChange}
-          onResetData={onResetData}
           onResetFinancialData={onResetFinancialData}
-          onResetInventoryStock={onResetInventoryStock}
-          onResetOperationData={onResetOperationData}
           pageTitle={pageTitle}
           repositoryStatus={repositoryStatus}
           syncStatus={syncStatus}
